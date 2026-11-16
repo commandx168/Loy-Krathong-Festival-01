@@ -19,13 +19,14 @@
       <div>
         <h1 class="brand-title">ลอยกระทงออนไลน์ ๒๕๖๙</h1>
         <div class="brand-subtitle">LOCAL CUSTOM LOY KRATHONG FESTIVAL</div>
+      <time id="siteDateTime" class="site-date-time"></time>
       </div>
     </div>
 
     <div class="header-actions">
       <!-- Live Krathong Counter -->
-      <div class="krathong-counter-badge" title="จำนวนกระทงที่ลอยอยู่ในสายน้ำทั้งหมด">
-        <span>กระทงในสายน้ำ:</span>
+      <div class="krathong-counter-badge" title="จำนวนกระทงที่ลอยจากเบราว์เซอร์นี้">
+        <span>กระทงที่ลอย:</span>
         <span class="counter-number" id="krathongCount">0</span>
         <span>ใบ</span>
       </div>
@@ -52,6 +53,10 @@
 
       <button class="btn-glass btn-icon-only" id="soundToggleBtn" title="เปิด/ปิดเสียง">
         <span id="soundIcon">🔔</span>
+      </button>
+      <button class="btn-glass" id="themeToggleBtn" type="button" aria-label="เปลี่ยนเป็นโหมดสว่าง">
+        <span id="themeIcon">☀️</span>
+        <span class="btn-text" id="themeLabel">โหมดสว่าง</span>
       </button>
     </div>
   </header>
@@ -108,11 +113,11 @@
           </div>
           <div class="step-indicator" data-step="3">
             <div class="step-circle">3</div>
-            <div class="step-label">อธิษฐาน & ลอย</div>
+            <div class="step-label">ชื่อ & คำอธิษฐาน</div>
           </div>
           <div class="step-indicator" data-step="4">
             <div class="step-circle">4</div>
-            <div class="step-label">ข้อมูลกระทง</div>
+            <div class="step-label">ยืนยัน & ลอย</div>
           </div>
         </div>
         
@@ -127,6 +132,7 @@
           <div style="font-size: 13px; color: #cfd8dc; margin-bottom: 8px;">
             เลือกฐานกระทงมงคลที่คุณชื่นชอบ หรืออัปโหลดภาพฐานกระทงของคุณเอง:
           </div>
+          <button class="btn-glass random-krathong-btn" id="btnRandomKrathong" type="button">🎲 สุ่มแบบกระทงให้ฉัน</button>
           <div class="bases-grid" id="basesGrid"></div>
           <input type="file" id="baseUploadInput" accept="image/*" style="display: none;">
         </div>
@@ -177,9 +183,30 @@
           </div>
 
           <div class="form-group">
+            <label class="couple-toggle">
+              <input type="checkbox" id="coupleModeInput">
+              <span>💞 ลอยกระทงแบบคู่</span>
+            </label>
+            <div id="partnerNameGroup" class="partner-name-group" hidden>
+              <label class="form-label" for="partnerNameInput">ชื่อคู่ของคุณ:</label>
+              <input type="text" class="form-input" id="partnerNameInput" placeholder="ชื่อผู้ร่วมลอยกระทง" maxlength="30">
+              <small>กรอกชื่อของทั้งสองคนเพื่อร่วมลอยกระทงหนึ่งใบ</small>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label class="form-label" for="wishTextInput">คำอธิษฐาน & ขอขมาพระแม่คงคา:</label>
             <div class="quick-wishes-tags" id="quickWishTags"></div>
             <textarea class="form-textarea" id="wishTextInput" rows="4" placeholder="พิมพ์คำอธิษฐานของคุณ หรือคลิกเลือกข้อความมงคลด้านบน..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="privacySelect">ความเป็นส่วนตัว:</label>
+            <select class="form-input" id="privacySelect">
+              <option value="public">แสดงชื่อและคำอธิษฐาน</option>
+              <option value="anonymous">แสดงคำอธิษฐาน แต่ไม่แสดงชื่อ</option>
+              <option value="private">ไม่แสดงชื่อและคำอธิษฐานแก่ผู้อื่น</option>
+            </select>
+            <small class="privacy-note">ข้อมูลกระทงบันทึกในเบราว์เซอร์นี้เท่านั้น</small>
           </div>
         </div>
 
@@ -191,34 +218,32 @@
             <h3>🪷 ตรวจสอบกระทงของคุณ</h3>
             <p>ตรวจสอบรายละเอียดก่อนนำกระทงลงสู่สายน้ำ</p>
 
-          <!-- Krathong Preview -->
-          <div class="summary-preview">
-          <canvas id="summaryCanvas" width="480" height="360"></canvas>
-        </div>
+            <div class="summary-preview">
+              <canvas id="summaryCanvas" width="480" height="360"></canvas>
+            </div>
 
-          <!-- Owner Name -->
-          <div class="summary-info">
-            <div class="summary-label">👤 ชื่อผู้ลอยกระทง</div>
-              <div class="summary-value" id="summaryOwnerName">
-                ยังไม่ได้ระบุชื่อ
-              </div>
-          </div>
+            <div class="summary-info">
+              <div class="summary-label">👤 ผู้ลอยกระทง</div>
+              <div class="summary-value" id="summaryOwnerName">ยังไม่ได้ระบุชื่อ</div>
+            </div>
+            <div class="summary-info">
+              <div class="summary-label">🙏 คำอธิษฐาน</div>
+              <div class="summary-value" id="summaryWish">ยังไม่ได้ระบุคำอธิษฐาน</div>
+            </div>
+            <div class="summary-info">
+              <div class="summary-label">🔒 การแสดงผล</div>
+              <div class="summary-value" id="summaryPrivacy"></div>
+            </div>
+            <div class="summary-share-actions">
+              <button class="btn-glass" id="btnShareKrathong" type="button">📤 แชร์ภาพกระทง</button>
+              <button class="btn-glass" id="btnDownloadKrathong" type="button">🖼️ บันทึกภาพกระทง</button>
+            </div>
 
-        <!-- Wish -->
-        <div class="summary-info">
-          <div class="summary-label">🙏 คำอธิษฐาน</div>
-          <div class="summary-value" id="summaryWish">
-            ยังไม่ได้ระบุคำอธิษฐาน
-          </div>
-        </div>
-
-        <!-- Confirmation Notice -->
-        <div class="summary-notice">
-          ✨ ตรวจสอบข้อมูลเรียบร้อยแล้ว
-          <br>
-            พร้อมส่งกระทงของคุณลอยไปกับสายน้ำ
-          </div>
-
+            <div class="summary-notice">
+              ✨ ตรวจสอบข้อมูลเรียบร้อยแล้ว
+              <br>
+              พร้อมส่งกระทงของคุณลอยไปกับสายน้ำ
+            </div>
           </div>
 
         </div>
@@ -357,6 +382,7 @@
        APPLICATION JAVASCRIPT MODULES
        ======================================================================== -->
   <script src="js/db.js"></script>
+  <script src="js/theme.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/river.js"></script>
