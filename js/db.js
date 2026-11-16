@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = 'LoyKrathongDB';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 class LoyKrathongDatabase {
   constructor() {
@@ -49,10 +49,24 @@ class LoyKrathongDatabase {
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
+
+        if (!db.objectStoreNames.contains('float_events')) {
+          const store = db.createObjectStore('float_events', { keyPath: 'id' });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+          store.createIndex('privacy', 'privacy', { unique: false });
+          store.createIndex('pairId', 'pairId', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains('pair_invites')) {
+          const store = db.createObjectStore('pair_invites', { keyPath: 'id' });
+          store.createIndex('status', 'status', { unique: false });
+          store.createIndex('createdAt', 'createdAt', { unique: false });
+        }
       };
 
       request.onsuccess = (event) => {
         this.db = event.target.result;
+        this.db.onversionchange = () => this.db.close();
         resolve(this.db);
       };
 
@@ -273,7 +287,7 @@ class LoyKrathongDatabase {
     const customDecorations = await this.getCustomDecorations();
     const customBackgrounds = await this.getCustomBackgrounds();
 
-    const settingsKeys = ['waterlineHeight', 'reflectionOpacity', 'activeBackgroundId', 'soundEnabled'];
+    const settingsKeys = ['waterlineHeight', 'reflectionOpacity', 'activeBackgroundId', 'soundEnabled', 'theme'];
     const settings = {};
     for (const k of settingsKeys) {
       settings[k] = await this.getSetting(k, null);
@@ -352,7 +366,7 @@ class LoyKrathongDatabase {
 
   async clearAllData() {
     await this.ready();
-    const stores = ['krathongs', 'custom_bases', 'custom_decorations', 'custom_backgrounds', 'settings'];
+    const stores = ['krathongs', 'custom_bases', 'custom_decorations', 'custom_backgrounds', 'settings', 'float_events', 'pair_invites'];
     const transaction = this.db.transaction(stores, 'readwrite');
     for (const s of stores) {
       transaction.objectStore(s).clear();
@@ -363,6 +377,8 @@ class LoyKrathongDatabase {
     });
   }
 }
+
+
 
 // Global instance
 window.LoyDB = new LoyKrathongDatabase();

@@ -11,6 +11,7 @@ class LoyKrathongApp {
     this.selectedFlowers = new Set();
     this.audioEnabled = true;
     this.audioCtx = null;
+    this.clockInterval = null;
 
     // References to modules
     this.river = null;
@@ -27,6 +28,7 @@ class LoyKrathongApp {
     // 1. Initialize Database & Seed initial sample krathongs if empty
     await LoyDB.ready();
     await this.seedInitialKrathongsIfEmpty();
+    await ThemeManager.init();
 
     // 2. Load User Settings
     const waterline = await LoyDB.getSetting('waterlineHeight', 62);
@@ -85,8 +87,10 @@ class LoyKrathongApp {
     this.dom = {
       riverContainer: document.getElementById('riverContainer'),
       krathongCount: document.getElementById('krathongCount'),
+      siteDateTime: document.getElementById('siteDateTime'),
       soundToggleBtn: document.getElementById('soundToggleBtn'),
       soundIcon: document.getElementById('soundIcon'),
+      themeToggleBtn: document.getElementById('themeToggleBtn'),
 
       // Buttons
       btnOpenPlay: document.getElementById('btnOpenPlay'),
@@ -131,10 +135,21 @@ class LoyKrathongApp {
       wizardPrevBtn: document.getElementById('wizardPrevBtn'),
       wizardNextBtn: document.getElementById('wizardNextBtn'),
       wizardLaunchBtn: document.getElementById('wizardLaunchBtn'),
+      btnRandomKrathong: document.getElementById('btnRandomKrathong'),
+      btnShareKrathong: document.getElementById('btnShareKrathong'),
+      btnDownloadKrathong: document.getElementById('btnDownloadKrathong'),
 
       // Step 3 Inputs
       ownerNameInput: document.getElementById('ownerNameInput'),
+      coupleModeInput: document.getElementById('coupleModeInput'),
+      partnerNameGroup: document.getElementById('partnerNameGroup'),
+      partnerNameInput: document.getElementById('partnerNameInput'),
       wishTextInput: document.getElementById('wishTextInput'),
+      privacySelect: document.getElementById('privacySelect'),
+      summaryOwnerName: document.getElementById('summaryOwnerName'),
+      summaryWish: document.getElementById('summaryWish'),
+      summaryPrivacy: document.getElementById('summaryPrivacy'),
+      summaryCanvas: document.getElementById('summaryCanvas'),
       quickWishTags: document.getElementById('quickWishTags'),
 
       // Background Modal Inputs
@@ -357,6 +372,9 @@ class LoyKrathongApp {
     });
 
     this.dom.soundToggleBtn.addEventListener('click', () => this.toggleSound());
+    this.dom.themeToggleBtn.addEventListener('click', () => ThemeManager.toggle());
+    this.updateSiteDateTime();
+    this.clockInterval = window.setInterval(() => this.updateSiteDateTime(), 1000);
 
     // Modal Close buttons
     document.querySelectorAll('.modal-close-btn, [data-modal-close]').forEach((btn) => {
@@ -394,10 +412,16 @@ class LoyKrathongApp {
 
     this.dom.wizardNextBtn.addEventListener('click', () => {
       this.playClickSound();
-      if (this.currentStep < 3) this.goToStep(this.currentStep + 1);
+      if (this.currentStep < 4) this.goToStep(this.currentStep + 1);
     });
 
     this.dom.wizardLaunchBtn.addEventListener('click', () => this.handleLaunchKrathong());
+    this.dom.btnRandomKrathong.addEventListener('click', () => this.randomizeKrathong());
+    this.dom.btnShareKrathong.addEventListener('click', () => this.shareDraftKrathong());
+    this.dom.btnDownloadKrathong.addEventListener('click', () => this.downloadDraftKrathong());
+    this.dom.coupleModeInput.addEventListener('change', () => {
+      this.dom.partnerNameGroup.hidden = !this.dom.coupleModeInput.checked;
+    });
 
     // Step indicators click
     this.dom.stepIndicators.forEach((ind) => {
@@ -512,6 +536,16 @@ class LoyKrathongApp {
     }
   }
 
+  updateSiteDateTime() {
+    if (!this.dom.siteDateTime) return;
+    const now = new Date();
+    this.dom.siteDateTime.dateTime = now.toISOString();
+    this.dom.siteDateTime.textContent = now.toLocaleString('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'medium'
+    });
+  }
+
   // --- WIZARD STEP NAVIGATION ---
 
   goToStep(stepNumber) {
@@ -532,13 +566,14 @@ class LoyKrathongApp {
 
     // Navigation Buttons visibility
     this.dom.wizardPrevBtn.style.visibility = stepNumber === 1 ? 'hidden' : 'visible';
-    if (stepNumber === 3) {
+    if (stepNumber === 4) {
       this.dom.wizardNextBtn.style.display = 'none';
       this.dom.wizardLaunchBtn.style.display = 'inline-flex';
     } else {
       this.dom.wizardNextBtn.style.display = 'inline-flex';
       this.dom.wizardLaunchBtn.style.display = 'none';
     }
+    if (stepNumber === 4) this.updateConfirmationSummary();
 
     // Deselect transform handles when moving away from Step 2
     if (stepNumber !== 2 && this.editor) {
@@ -604,6 +639,30 @@ class LoyKrathongApp {
     `;
     uploadCard.addEventListener('click', () => this.dom.baseUploadInput.click());
     this.dom.basesGrid.appendChild(uploadCard);
+  }
+
+  async randomizeKrathong() {
+    const base = KRATHONG_ASSETS.bases[Math.floor(Math.random() * KRATHONG_ASSETS.bases.length)];
+    const choices = [...KRATHONG_ASSETS.flowers, ...KRATHONG_ASSETS.items.slice(1)];
+    const decorationCount = 1 + Math.floor(Math.random() * 3);
+    const decorations = [];
+
+    while (decorations.length < decorationCount && choices.length > 0) {
+      const index = Math.floor(Math.random() * choices.length);
+      decorations.push(choices.splice(index, 1)[0]);
+    }
+
+    this.selectedBaseId = base.id;
+    await this.editor.setBase(base);
+    this.editor.clearDecorations();
+    await this.editor.addDecoration(KRATHONG_ASSETS.items[0]);
+    for (const decoration of decorations) {
+      await this.editor.addDecoration(decoration);
+    }
+    this.selectedFlowers = new Set(decorations.filter((item) => KRATHONG_ASSETS.flowers.includes(item)));
+    this.renderBasesGrid();
+    this.updateWishFromFlowers();
+    this.playChimeSound();
   }
 
   async handleCustomBaseUpload(event) {
@@ -774,31 +833,53 @@ class LoyKrathongApp {
     }
   }
 
-  async handleLaunchKrathong() {
-    const name = this.dom.ownerNameInput.value.trim() || 'ผู้ไม่ประสงค์ออกนาม';
-    const wish = this.dom.wishTextInput.value.trim() || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี ๒๕๖๙';
-
-    // 1. Render Composite High-Res Image of Krathong
-    const highResDataUrl = await this.editor.renderCompositeImage(480, 360);
-
-    // 2. Build Krathong Data Object
-    const krathongData = {
-      id: 'krathong_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: name,
-      wish: wish,
+  async getDraftKrathong() {
+    const firstName = this.dom.ownerNameInput.value.trim();
+    const secondName = this.dom.partnerNameInput.value.trim();
+    const name = this.dom.coupleModeInput.checked && secondName
+      ? `${firstName || 'ผู้ร่วมลอย'} & ${secondName}`
+      : firstName || 'ผู้ไม่ประสงค์ออกนาม';
+    return {
+      id: 'preview_' + Date.now(),
+      name,
+      wish: this.dom.wishTextInput.value.trim() || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี ๒๕๖๙',
       baseId: this.selectedBaseId,
       timestamp: Date.now(),
-      imageData: highResDataUrl,
-      decorationsSummary: this.editor.getDecorationsSummary()
+      imageData: await this.editor.renderCompositeImage(480, 360),
+      decorationsSummary: this.editor.getDecorationsSummary(),
+      privacy: this.dom.privacySelect.value,
+      isCouple: this.dom.coupleModeInput.checked
     };
+  }
 
-    // 3. Save to IndexedDB
+  async updateConfirmationSummary() {
+    const krathong = await this.getDraftKrathong();
+    const ctx = this.dom.summaryCanvas.getContext('2d');
+    const image = await this.loadImageAsync(krathong.imageData);
+    ctx.clearRect(0, 0, this.dom.summaryCanvas.width, this.dom.summaryCanvas.height);
+    if (image) ctx.drawImage(image, 0, 0, this.dom.summaryCanvas.width, this.dom.summaryCanvas.height);
+
+    this.dom.summaryOwnerName.textContent = krathong.name;
+    this.dom.summaryWish.textContent = krathong.wish;
+    this.dom.summaryPrivacy.textContent = this.privacyLabel(krathong.privacy);
+  }
+
+  privacyLabel(privacy) {
+    return {
+      public: 'แสดงชื่อและคำอธิษฐาน',
+      anonymous: 'แสดงคำอธิษฐานโดยไม่แสดงชื่อ',
+      private: 'ซ่อนชื่อและคำอธิษฐานจากผู้อื่น'
+    }[privacy] || 'แสดงชื่อและคำอธิษฐาน';
+  }
+
+  async handleLaunchKrathong() {
+    const krathongData = await this.getDraftKrathong();
+    krathongData.id = 'krathong_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
     await LoyDB.saveKrathong(krathongData);
 
-    // 4. Close Modal
     this.closeModal(this.dom.playModal);
 
-    // 5. Sound & Launch into River
     this.playSplashSound();
     this.playFireworkSound();
     await this.river.launchNewKrathong(krathongData);
@@ -839,9 +920,10 @@ class LoyKrathongApp {
     this.dom.blessingsList.innerHTML = '';
 
     const q = filterQuery.toLowerCase().trim();
-    const filtered = list.filter((k) => {
+    const filtered = list.filter((k) => k.privacy !== 'private').filter((k) => {
+      const visible = this.getPrivacySafeKrathong(k);
       if (!q) return true;
-      return (k.name && k.name.toLowerCase().includes(q)) || (k.wish && k.wish.toLowerCase().includes(q));
+      return (visible.name && visible.name.toLowerCase().includes(q)) || (visible.wish && visible.wish.toLowerCase().includes(q));
     });
 
     if (filtered.length === 0) {
@@ -854,6 +936,7 @@ class LoyKrathongApp {
     }
 
     filtered.forEach((k) => {
+      const visible = this.getPrivacySafeKrathong(k);
       const card = document.createElement('div');
       card.className = 'blessing-card';
       const timeStr = new Date(k.timestamp).toLocaleString('th-TH', {
@@ -863,38 +946,49 @@ class LoyKrathongApp {
         minute: '2-digit'
       });
 
-      card.innerHTML = `
-        <div class="blessing-card-header">
-          <img class="blessing-card-thumb" src="${k.imageData || ''}" alt="กระทง">
-          <div class="blessing-card-info">
-            <div class="blessing-card-name">${k.name}</div>
-            <div class="blessing-card-date">${timeStr}</div>
-          </div>
-        </div>
-        <div class="blessing-card-body">${k.wish}</div>
-        <div class="blessing-card-footer">
-          <button class="btn-glass" data-action="download-card" style="font-size:12px;padding:5px 12px;">
-            🖼️ บันทึกการ์ด (PNG)
-          </button>
-          <button class="btn-glass" data-action="delete-krathong" style="font-size:12px;padding:5px 10px;color:#ff5252;">
-            🗑️ ลบ
-          </button>
-        </div>
-      `;
+      const header = document.createElement('div');
+      header.className = 'blessing-card-header';
+      const thumbnail = document.createElement('img');
+      thumbnail.className = 'blessing-card-thumb';
+      thumbnail.alt = 'กระทง';
+      if (typeof k.imageData === 'string' && k.imageData.startsWith('data:image/')) {
+        thumbnail.src = k.imageData;
+      }
+      const info = document.createElement('div');
+      info.className = 'blessing-card-info';
+      const name = document.createElement('div');
+      name.className = 'blessing-card-name';
+      name.textContent = visible.name;
+      const date = document.createElement('div');
+      date.className = 'blessing-card-date';
+      date.textContent = timeStr;
+      info.append(name, date);
+      header.append(thumbnail, info);
 
-      card.querySelector('[data-action="download-card"]').addEventListener('click', () => {
-        this.generateAndDownloadCard(k);
+      const body = document.createElement('div');
+      body.className = 'blessing-card-body';
+      body.textContent = visible.wish;
+      const footer = document.createElement('div');
+      footer.className = 'blessing-card-footer';
+      const downloadButton = document.createElement('button');
+      downloadButton.className = 'btn-glass';
+      downloadButton.textContent = '🖼️ บันทึกการ์ด (PNG)';
+      downloadButton.addEventListener('click', () => {
+        this.generateAndDownloadCard(visible);
       });
-
-      card.querySelector('[data-action="delete-krathong"]').addEventListener('click', async () => {
-        if (confirm(`คุณต้องการลบกระทงของ "${k.name}" ใช่หรือไม่?`)) {
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'btn-glass';
+      deleteButton.textContent = '🗑️ ลบ';
+      deleteButton.addEventListener('click', async () => {
+        if (confirm(`คุณต้องการลบกระทงของ "${visible.name}" ใช่หรือไม่?`)) {
           await LoyDB.deleteKrathong(k.id);
           const updated = await LoyDB.getAllKrathongs();
           await this.river.loadKrathongs(updated);
           this.renderBlessingsList(this.dom.blessingsSearchInput.value);
         }
       });
-
+      footer.append(downloadButton, deleteButton);
+      card.append(header, body, footer);
       this.dom.blessingsList.appendChild(card);
     });
   }
@@ -903,9 +997,29 @@ class LoyKrathongApp {
     this.renderBlessingsList(query);
   }
 
+  getPrivacySafeKrathong(krathong) {
+    if (krathong.privacy === 'private') {
+      return { ...krathong, name: 'กระทงส่วนตัว', wish: 'คำอธิษฐานนี้เป็นส่วนตัว' };
+    }
+    if (krathong.privacy === 'anonymous') {
+      return { ...krathong, name: 'ไม่ประสงค์ออกนาม' };
+    }
+    return krathong;
+  }
+
+  async shareDraftKrathong() {
+    const krathong = this.getPrivacySafeKrathong(await this.getDraftKrathong());
+    await this.generateAndDownloadCard(krathong, true);
+  }
+
+  async downloadDraftKrathong() {
+    const krathong = this.getPrivacySafeKrathong(await this.getDraftKrathong());
+    await this.generateAndDownloadCard(krathong);
+  }
+
   // --- POSTCARD PNG CARD GENERATOR ---
 
-  async generateAndDownloadCard(krathong) {
+  async generateAndDownloadCard(krathong, share = false) {
     const cardCanvas = document.createElement('canvas');
     cardCanvas.width = 800;
     cardCanvas.height = 1000;
@@ -1035,10 +1149,23 @@ class LoyKrathongApp {
     ctx.fillText(`ลอยเมื่อ: ${dateFormatted}`, 400, 915);
 
     // 8. Trigger Browser Download
-    const downloadLink = document.createElement('a');
-    downloadLink.download = `LoyKrathong_${krathong.name.replace(/\s+/g, '_')}.png`;
-    downloadLink.href = cardCanvas.toDataURL('image/png');
-    downloadLink.click();
+    const blob = await new Promise((resolve) => cardCanvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('ไม่สามารถสร้างภาพกระทงได้');
+
+    const file = new File([blob], 'LoyKrathong.png', { type: 'image/png' });
+    if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: 'ลอยกระทงออนไลน์',
+        text: 'กระทงและคำอธิษฐานของฉัน',
+        files: [file]
+      });
+    } else {
+      const downloadLink = document.createElement('a');
+      downloadLink.download = `LoyKrathong_${krathong.name.replace(/\s+/g, '_')}.png`;
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadLink.href), 1000);
+    }
     this.playChimeSound();
   }
 
@@ -1061,31 +1188,70 @@ class LoyKrathongApp {
 
   // --- BACKGROUND CUSTOMIZATION ---
 
+  
   async handleCustomBgUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target.result;
+    // ตรวจสอบประเภทไฟล์
+    if (!file.type.startsWith('image/')) {
+      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      event.target.value = '';
+      return;
+    }
+
+    // จำกัดขนาดไฟล์ 10 MB
+    if (file.size > 10 * 1024 * 1024) {
+      alert('รูปภาพต้องมีขนาดไม่เกิน 10 MB');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+
+      // ตรวจสอบว่ารูปโหลดได้จริง
+      const img = await this.loadImageAsync(dataUrl);
+
+      if (!img) {
+        throw new Error('ไม่สามารถเปิดรูปภาพนี้ได้');
+      }
+    
+
+      // บันทึกรูปภาพลง IndexedDB
       const bgObj = {
         name: file.name.replace(/\.[^/.]+$/, ''),
         dataUrl: dataUrl
       };
+
       const saved = await LoyDB.saveCustomBackground(bgObj);
+
+      // บันทึก Background ที่กำลังใช้งาน
       await LoyDB.setSetting('activeBackgroundId', saved.id);
 
-      const img = new Image();
-      img.onload = () => {
-        this.river.setBackground({ imgElement: img });
-      };
-      img.src = dataUrl;
+      // แสดงพื้นหลังใหม่
+      this.river.setBackground({
+        imgElement: img
+      });
+
       this.playChimeSound();
-      alert('เปลี่ยนฉากหลังสำเร็จแล้ว!');
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+
+      alert('เปลี่ยนฉากหลังสำเร็จแล้ว! 🪷');
+
+    } catch (err) {
+      console.error('Background Upload Error:', err);
+      alert('ไม่สามารถเปลี่ยนฉากหลังได้: ' + err.message);
+
+    } finally {
+      event.target.value = '';
+    }
   }
+
 
   // --- BACKUP & RESTORE ---
 

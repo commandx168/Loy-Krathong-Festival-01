@@ -189,7 +189,7 @@ class RiverScene {
   async loadKrathongs(krathongsList) {
     this.allKrathongs = krathongsList || [];
     if (this.onCountChange) {
-      this.onCountChange(this.allKrathongs.length);
+      this.onCountChange(this.countFloatedKrathongs());
     }
 
     // Populate active river krathongs
@@ -202,6 +202,10 @@ class RiverScene {
         initialProgress: Math.random() * this.width
       });
     }
+  }
+
+  countFloatedKrathongs() {
+    return this.allKrathongs.filter((krathong) => !String(krathong.id).startsWith('sample_')).length;
   }
 
   async getCachedImage(srcOrSvg) {
@@ -266,8 +270,15 @@ class RiverScene {
 
     const floatingObj = {
       id: data.id,
-      name: data.name || 'ผู้ไม่ประสงค์ออกนาม',
-      wish: data.wish || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี',
+      name: data.privacy === 'private'
+        ? 'กระทงส่วนตัว'
+        : data.privacy === 'anonymous'
+          ? 'ไม่ประสงค์ออกนาม'
+          : data.name || 'ผู้ไม่ประสงค์ออกนาม',
+      wish: data.privacy === 'private'
+        ? 'คำอธิษฐานนี้เป็นส่วนตัว'
+        : data.wish || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี',
+      privacy: data.privacy || 'public',
       timestamp: data.timestamp || Date.now(),
       imgElement: img,
       imageData: data.imageData,
@@ -299,7 +310,7 @@ class RiverScene {
   async launchNewKrathong(krathongData) {
     this.allKrathongs.unshift(krathongData);
     if (this.onCountChange) {
-      this.onCountChange(this.allKrathongs.length);
+      this.onCountChange(this.countFloatedKrathongs());
     }
 
     const newObj = await this.spawnFloatingKrathong(krathongData, {
@@ -562,8 +573,15 @@ class RiverScene {
           const randomIdx = Math.floor(Math.random() * this.allKrathongs.length);
           const freshData = this.allKrathongs[randomIdx];
           k.id = freshData.id;
-          k.name = freshData.name;
-          k.wish = freshData.wish;
+          k.name = freshData.privacy === 'private'
+            ? 'กระทงส่วนตัว'
+            : freshData.privacy === 'anonymous'
+              ? 'ไม่ประสงค์ออกนาม'
+              : freshData.name;
+          k.wish = freshData.privacy === 'private'
+            ? 'คำอธิษฐานนี้เป็นส่วนตัว'
+            : freshData.wish;
+          k.privacy = freshData.privacy || 'public';
           k.timestamp = freshData.timestamp;
           if (freshData.imageData) {
             this.getCachedImage(freshData.imageData).then((img) => {
@@ -907,7 +925,11 @@ class RiverScene {
     this.ctx.save();
     const tagY = k.height * 0.52 + 10;
     const maxChars = 14;
-    const displayName = k.name.length > maxChars ? k.name.substring(0, maxChars) + '…' : k.name;
+    const displayName = k.privacy === 'private'
+      ? 'กระทงส่วนตัว'
+      : k.privacy === 'anonymous'
+        ? 'ไม่ประสงค์ออกนาม'
+        : k.name.length > maxChars ? k.name.substring(0, maxChars) + '…' : k.name;
 
     // Measurement
     this.ctx.font = `600 ${Math.max(10, Math.round(11 * k.scale))}px "Kanit", sans-serif`;
