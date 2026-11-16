@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="ลอยกระทงออนไลน์ ๒๕๖๙ - สร้างและตกแต่งกระทงตามใจชอบ อัปโหลดฉากหลัง และลอยกระทงในสายน้ำคืนวันเพ็ญ">
+  <title>ลอยกระทงออนไลน์ ๒๕๖๙ | Local Custom Loy Krathong</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪷</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       TOP HEADER TOOLBAR
+       ======================================================================== -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-icon">🪷</div>
+      <div>
+        <h1 class="brand-title">ลอยกระทงออนไลน์ ๒๕๖๙</h1>
+        <div class="brand-subtitle">LOCAL CUSTOM LOY KRATHONG FESTIVAL</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Live Krathong Counter -->
+      <div class="krathong-counter-badge" title="จำนวนกระทงที่ลอยอยู่ในสายน้ำทั้งหมด">
+        <span>กระทงในสายน้ำ:</span>
+        <span class="counter-number" id="krathongCount">0</span>
+        <span>ใบ</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <button class="btn-float-cta" id="btnOpenPlay" title="สร้างกระทงใหม่">
+        <span>✨</span>
+        <span>สร้างกระทง / ลอยกระทง</span>
+      </button>
+
+      <button class="btn-glass" id="btnOpenBlessings" title="ดูคำอธิษฐานทั้งหมด">
+        <span>📜</span>
+        <span class="btn-text">คำอธิษฐานทั้งหมด</span>
+      </button>
+
+      <button class="btn-glass" id="btnOpenBgSettings" title="ตั้งค่าและอัปโหลดฉากหลัง">
+        <span>🖼️</span>
+        <span class="btn-text">เปลี่ยนฉากหลัง</span>
+      </button>
+
+      <button class="btn-glass btn-icon-only" id="btnOpenBackup" title="สำรอง / กู้คืนข้อมูล (JSON)">
+        <span>💾</span>
+      </button>
+
+      <button class="btn-glass btn-icon-only" id="soundToggleBtn" title="เปิด/ปิดเสียง">
+        <span id="soundIcon">🔔</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       MAIN RIVER VIEWPORT (CANVAS ANIMATION SCENE)
+       ======================================================================== -->
+  <main id="riverContainer" aria-label="แม่น้ำลอยกระทงคืนวันเพ็ญ"></main>
+
+  <!-- ========================================================================
+       SPEECH BUBBLE POPUP (BLESSING TOOLTIP OVER CLICKED KRATHONG)
+       ======================================================================== -->
+  <div id="speechBubbleContainer" style="display: none;">
+    <div class="speech-bubble">
+      <button class="bubble-close-btn" id="bubbleCloseBtn" title="ปิด">✕</button>
+      <img id="bubbleThumb" class="bubble-krathong-thumb" src="" alt="รูปกระทง">
+      <div class="bubble-author-title">
+        <span>🪷 กระทงของ:</span>
+        <span id="bubbleAuthor">ชื่อผู้ลอย</span>
+      </div>
+      <div id="bubbleWish" class="bubble-wish-text">คำอธิษฐาน</div>
+      <div id="bubbleTime" class="bubble-time">เวลาที่ลอย</div>
+      <div class="bubble-actions">
+        <button class="btn-glass" id="bubbleDownloadBtn">
+          <span>🖼️ บันทึกการ์ดที่ระลึก (PNG)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 1: KRATHONG BUILDER WIZARD (/play)
+       ======================================================================== -->
+  <div class="modal-overlay" id="playModal" role="dialog" aria-modal="true" aria-labelledby="playModalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="playModalTitle">
+          <span>✨</span>
+          <span>สตูดิโอสร้างกระทงวันเพ็ญ</span>
+        </div>
+        <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 4-Step Indicator Bar -->
+        <div class="wizard-steps-nav">
+          <div class="step-indicator active" data-step="1">
+            <div class="step-circle">1</div>
+            <div class="step-label">เลือกฐานกระทง</div>
+          </div>
+          <div class="step-indicator" data-step="2">
+            <div class="step-circle">2</div>
+            <div class="step-label">ตกแต่งกระทง</div>
+          </div>
+          <div class="step-indicator" data-step="3">
+            <div class="step-circle">3</div>
+            <div class="step-label">อธิษฐาน & ลอย</div>
+          </div>
+          <div class="step-indicator" data-step="4">
+            <div class="step-circle">4</div>
+            <div class="step-label">ข้อมูลกระทง</div>
+          </div>
+        </div>
+        
+        <!-- Live Preview Bowl Canvas -->
+        <div class="editor-preview-bowl">
+          <canvas id="editorCanvas" width="480" height="360"></canvas>
+          <div class="bowl-hint-badge">💡 สามารถคลิกลาก / ย่อขยาย / หมุนบนตัวกระทงได้</div>
+        </div>
+
+        <!-- STEP 1: CHOOSE BASE -->
+        <div class="wizard-step-view" data-step="1">
+          <div style="font-size: 13px; color: #cfd8dc; margin-bottom: 8px;">
+            เลือกฐานกระทงมงคลที่คุณชื่นชอบ หรืออัปโหลดภาพฐานกระทงของคุณเอง:
+          </div>
+          <div class="bases-grid" id="basesGrid"></div>
+          <input type="file" id="baseUploadInput" accept="image/*" style="display: none;">
+        </div>
+
+        <!-- STEP 2: DECORATE & UPLOAD CUSTOM STICKERS -->
+        <div class="wizard-step-view" data-step="2" style="display: none;">
+          <!-- Category Tabs -->
+          <div class="decorations-tabs">
+            <button class="deco-tab-btn active" data-category="flowers">🌸 ดอกไม้มงคล (๕ ชนิด)</button>
+            <button class="deco-tab-btn" data-category="items">🕯️ ธูปเทียน & ของมงคล</button>
+            <button class="deco-tab-btn" data-category="custom">📁 รูปภาพของคุณเอง</button>
+          </div>
+
+          <!-- Items Grid -->
+          <div class="decorations-grid" id="decorationsGrid"></div>
+          <input type="file" id="decoUploadInput" accept="image/*" style="display: none;">
+
+          <!-- Selected Item Transform Action Strip -->
+          <div class="selected-item-bar" id="selectedItemBar" style="display: none;">
+            <div style="font-weight: 600; color: #ffd54f;" id="selectedItemName">ชิ้นส่วนที่เลือก</div>
+            <div class="control-group">
+              <span style="font-size: 11px;">ขนาด:</span>
+              <input type="range" class="custom-range" id="itemScaleSlider" min="0.3" max="2.8" step="0.05" value="1.0" style="width: 70px;">
+            </div>
+            <div class="control-group">
+              <span style="font-size: 11px;">หมุน:</span>
+              <input type="range" class="custom-range" id="itemRotateSlider" min="-180" max="180" step="5" value="0" style="width: 60px;">
+            </div>
+            <div class="control-group">
+              <button class="control-btn-icon" id="btnBringForward" title="ย้ายมาด้านหน้า">▲</button>
+              <button class="control-btn-icon" id="btnSendBackward" title="ย้ายไปด้านหลัง">▼</button>
+              <button class="control-btn-icon danger" id="btnDeleteItem" title="ลบชิ้นนี้">🗑️</button>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+            <button class="btn-glass" id="btnClearAllDeco" style="font-size: 11px; padding: 4px 10px;">
+              ล้างของตกแต่งทั้งหมด
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: NAME & WISH -->
+        <div class="wizard-step-view" data-step="3" style="display: none;">
+          <div class="form-group">
+            <label class="form-label" for="ownerNameInput">ชื่อของคุณ (แสดงบนป้ายกระทง):</label>
+            <input type="text" class="form-input" id="ownerNameInput" placeholder="เช่น น้องน้ำใส, พี่ต้นกล้า, หรือชื่อเล่นของคุณ" maxlength="30">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="wishTextInput">คำอธิษฐาน & ขอขมาพระแม่คงคา:</label>
+            <div class="quick-wishes-tags" id="quickWishTags"></div>
+            <textarea class="form-textarea" id="wishTextInput" rows="4" placeholder="พิมพ์คำอธิษฐานของคุณ หรือคลิกเลือกข้อความมงคลด้านบน..."></textarea>
+          </div>
+        </div>
+
+        <!-- STEP 4: CONFIRMATION & SUMMARY -->
+        <div class="wizard-step-view" data-step="4" style="display: none;">
+
+          <div class="confirmation-summary">
+
+            <h3>🪷 ตรวจสอบกระทงของคุณ</h3>
+            <p>ตรวจสอบรายละเอียดก่อนนำกระทงลงสู่สายน้ำ</p>
+
+          <!-- Krathong Preview -->
+          <div class="summary-preview">
+          <canvas id="summaryCanvas" width="480" height="360"></canvas>
+        </div>
+
+          <!-- Owner Name -->
+          <div class="summary-info">
+            <div class="summary-label">👤 ชื่อผู้ลอยกระทง</div>
+              <div class="summary-value" id="summaryOwnerName">
+                ยังไม่ได้ระบุชื่อ
+              </div>
+          </div>
+
+        <!-- Wish -->
+        <div class="summary-info">
+          <div class="summary-label">🙏 คำอธิษฐาน</div>
+          <div class="summary-value" id="summaryWish">
+            ยังไม่ได้ระบุคำอธิษฐาน
+          </div>
+        </div>
+
+        <!-- Confirmation Notice -->
+        <div class="summary-notice">
+          ✨ ตรวจสอบข้อมูลเรียบร้อยแล้ว
+          <br>
+            พร้อมส่งกระทงของคุณลอยไปกับสายน้ำ
+          </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-glass" id="wizardPrevBtn" style="visibility: hidden;">
+          ← ย้อนกลับ
+        </button>
+        <button class="btn-float-cta" id="wizardNextBtn">
+          ถัดไป →
+        </button>
+        <button class="btn-float-cta" id="wizardLaunchBtn" style="display: none;">
+          🪷 ลอยกระทงกันเลย!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 2: CUSTOM BACKGROUND SETTINGS
+       ======================================================================== -->
+  <div class="modal-overlay" id="bgSettingsModal" role="dialog" aria-modal="true" aria-labelledby="bgSettingsTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="bgSettingsTitle">
+          <span>🖼️</span>
+          <span>ปรับแต่งและเปลี่ยนฉากหลัง</span>
+        </div>
+        <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="bg-dropzone" id="bgDropzone">
+          <div style="font-size: 32px; margin-bottom: 6px;">📤</div>
+          <div style="font-weight: 600; color: #ffd54f;">คลิกเพื่ออัปโหลดภาพฉากหลังใหม่</div>
+          <div style="font-size: 12px; color: #90a4ae; margin-top: 4px;">รองรับไฟล์ JPG, PNG, WebP, GIF</div>
+        </div>
+        <input type="file" id="bgFileInput" accept="image/*" style="display: none;">
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>ระดับความสูงผิวน้ำ (Waterline):</span>
+            <span id="waterlineVal" style="color: #ffd54f; font-weight: 600;">62%</span>
+          </div>
+          <input type="range" class="custom-range" id="waterlineSlider" min="30" max="85" value="62">
+          <div style="font-size: 11px; color: #90a4ae; margin-top: 3px;">
+            ปรับตำแหน่งที่กระทงจะลอยให้สอดคล้องกับเส้นขอบน้ำของภาพฉากหลังที่คุณอัปโหลด
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>ความโปร่งแสงเงาสะท้อนน้ำ (Reflection):</span>
+            <span id="reflectionVal" style="color: #ffd54f; font-weight: 600;">45%</span>
+          </div>
+          <input type="range" class="custom-range" id="reflectionSlider" min="0" max="100" value="45">
+        </div>
+
+        <div style="margin-top: 18px; display: flex; justify-content: flex-end;">
+          <button class="btn-glass" id="btnResetBg">
+            🔄 สลับกลับไปใช้ฉากหลังเริ่มต้น
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 3: BLESSING FEED & CARDS (/blessing)
+       ======================================================================== -->
+  <div class="modal-overlay" id="blessingsModal" role="dialog" aria-modal="true" aria-labelledby="blessingsTitle">
+    <div class="modal-box" style="max-width: 760px;">
+      <div class="modal-header">
+        <div class="modal-title" id="blessingsTitle">
+          <span>📜</span>
+          <span>คำอธิษฐานในสายน้ำทั้งหมด</span>
+        </div>
+        <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="blessings-search-bar">
+          <input type="text" class="form-input" id="blessingsSearchInput" placeholder="🔍 ค้นหาตามชื่อผู้ลอย หรือข้อความคำอธิษฐาน...">
+        </div>
+
+        <div class="blessings-grid" id="blessingsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 4: BACKUP & RESTORE (JSON EXPORT / IMPORT)
+       ======================================================================== -->
+  <div class="modal-overlay" id="backupModal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="backupTitle">
+          <span>💾</span>
+          <span>สำรองและกู้คืนข้อมูล (Backup & Restore)</span>
+        </div>
+        <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-size: 13px; line-height: 1.6; color: #cfd8dc; margin-bottom: 18px;">
+          ระบบจะเก็บข้อมูลทั้งหมด (รูปฐานกระทงที่อัปโหลด, ของตกแต่ง, ฉากหลัง, และกระทงที่ลอยแล้วทั้งหมด) บันทึกไว้ในเครื่องของคุณ (IndexedDB)
+          คุณสามารถส่งออกไฟล์สำรอง (JSON) เพื่อนำไปใช้งานข้ามเครื่อง หรือกู้คืนข้อมูลได้ตลอดเวลา:
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button class="btn-glass" id="btnExportJson" style="justify-content: center; padding: 12px;">
+            <span>📥</span>
+            <span>ดาวน์โหลดไฟล์สำรองข้อมูลทั้งหมด (.JSON)</span>
+          </button>
+
+          <label class="btn-glass" style="justify-content: center; padding: 12px; cursor: pointer;">
+            <span>📤</span>
+            <span>เลือกไฟล์ JSON เพื่อกู้คืนข้อมูล (Import)</span>
+            <input type="file" id="backupFileInput" accept=".json" style="display: none;">
+          </label>
+
+          <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 8px 0;">
+
+          <button class="btn-glass" id="btnClearDatabase" style="justify-content: center; padding: 10px; color: #ff5252; border-color: rgba(255, 82, 82, 0.4);">
+            <span>⚠️</span>
+            <span>ล้างข้อมูลทั้งหมดในเครื่อง (Reset to Defaults)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       APPLICATION JAVASCRIPT MODULES
+       ======================================================================== -->
+  <script src="js/db.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/river.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
