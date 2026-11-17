@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="ลอยกระทงออนไลน์ ๒๕๖๙ - สร้างและตกแต่งกระทงตามใจชอบ อัปโหลดฉากหลัง และลอยกระทงในสายน้ำคืนวันเพ็ญ">
-  <title>ลอยกระทงออนไลน์ ๒๕๖๙ | Local Custom Loy Krathong</title>
+  <title>ลอยกระทงออนไลน์ ๒๕๖๙</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪷</text></svg>">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 
@@ -17,16 +17,18 @@
     <div class="brand-section">
       <div class="brand-icon">🪷</div>
       <div>
-        <h1 class="brand-title">ลอยกระทงออนไลน์ ๒๕๖๙</h1>
-        <div class="brand-subtitle">LOCAL CUSTOM LOY KRATHONG FESTIVAL</div>
-      <time id="siteDateTime" class="site-date-time"></time>
+        <h1 class="brand-title">สำนักงานประปาสาขาบางเขน ชวนลอยกระทงออนไลน์</h1>
+        <div class="brand-subtitle">
+          <span>Digital Loy Krathong: Save Water, Save Earth</span>
+          <span class="brand-subtitle-th">ลอยกระทงด้วยใจ สืบสานวิถีไทย รักษ์น้ำ รักษ์โลก</span>
+        </div>
       </div>
     </div>
 
     <div class="header-actions">
       <!-- Live Krathong Counter -->
-      <div class="krathong-counter-badge" title="จำนวนกระทงที่ลอยจากเบราว์เซอร์นี้">
-        <span>กระทงที่ลอย:</span>
+      <div class="krathong-counter-badge" title="จำนวนกระทงที่ลอยอยู่ในสายน้ำทั้งหมด">
+        <span>กระทงในสายน้ำ:</span>
         <span class="counter-number" id="krathongCount">0</span>
         <span>ใบ</span>
       </div>
@@ -54,12 +56,28 @@
       <button class="btn-glass btn-icon-only" id="soundToggleBtn" title="เปิด/ปิดเสียง">
         <span id="soundIcon">🔔</span>
       </button>
-      <button class="btn-glass" id="themeToggleBtn" type="button" aria-label="เปลี่ยนเป็นโหมดสว่าง">
-        <span id="themeIcon">☀️</span>
-        <span class="btn-text" id="themeLabel">โหมดสว่าง</span>
+      <button class="btn-glass" id="musicToggleBtn" type="button" aria-label="เล่นเพลง" title="เล่นหรือหยุดเพลงลอยกระทง">
+        <span aria-hidden="true">🎵</span>
+        <span class="music-button-text">เล่นเพลง</span>
       </button>
     </div>
   </header>
+
+  <audio id="backgroundMusic" src="bgmusics/เพลงลอยกระทง.mp3" preload="none" loop></audio>
+  <div class="music-credit">เพลงลอยกระทง · <a href="https://www.youtube.com/watch?v=CMEkHkX_dkg" target="_blank" rel="noopener noreferrer">อ้างอิงเพลง</a></div>
+  <aside class="reward-panel" id="rewardPanel" aria-label="สุ่มรางวัลผู้ร่วมกิจกรรม">
+    <div class="reward-panel-header">
+      <strong>🎁 ผู้บริหารสุ่มรางวัล</strong>
+      <button id="rewardToggleBtn" class="reward-toggle-btn" type="button" aria-expanded="true" aria-controls="rewardPanelBody" title="ย่อ/ขยายกล่องสุ่มรางวัล">▾</button>
+    </div>
+    <div class="reward-panel-body" id="rewardPanelBody">
+      <div class="reward-panel-actions">
+        <button id="drawWinnerBtn" class="btn-glass" type="button">สุ่มจากรายชื่อผู้ลอยกระทง</button>
+        <button id="viewWinnersBtn" class="btn-glass" type="button" title="ดูรายชื่อผู้ได้รับรางวัล">🏆</button>
+      </div>
+      <span id="drawResult" role="status">ผู้ร่วมกิจกรรมที่แสดงชื่อมีสิทธิ์ร่วมสุ่ม</span>
+    </div>
+  </aside>
 
   <!-- ========================================================================
        MAIN RIVER VIEWPORT (CANVAS ANIMATION SCENE)
@@ -101,7 +119,7 @@
       </div>
 
       <div class="modal-body">
-        <!-- 4-Step Indicator Bar -->
+        <!-- 3-Step Indicator Bar -->
         <div class="wizard-steps-nav">
           <div class="step-indicator active" data-step="1">
             <div class="step-circle">1</div>
@@ -113,14 +131,10 @@
           </div>
           <div class="step-indicator" data-step="3">
             <div class="step-circle">3</div>
-            <div class="step-label">ชื่อ & คำอธิษฐาน</div>
-          </div>
-          <div class="step-indicator" data-step="4">
-            <div class="step-circle">4</div>
-            <div class="step-label">ยืนยัน & ลอย</div>
+            <div class="step-label">อธิษฐาน & ลอย</div>
           </div>
         </div>
-        
+
         <!-- Live Preview Bowl Canvas -->
         <div class="editor-preview-bowl">
           <canvas id="editorCanvas" width="480" height="360"></canvas>
@@ -129,10 +143,13 @@
 
         <!-- STEP 1: CHOOSE BASE -->
         <div class="wizard-step-view" data-step="1">
-          <div style="font-size: 13px; color: #cfd8dc; margin-bottom: 8px;">
-            เลือกฐานกระทงมงคลที่คุณชื่นชอบ หรืออัปโหลดภาพฐานกระทงของคุณเอง:
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #cfd8dc; margin-bottom: 8px;">
+            <span>เลือกฐานกระทงมงคลที่คุณชื่นชอบ หรืออัปโหลดภาพฐานกระทงของคุณเอง:</span>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #ffd54f; cursor: pointer;">
+              <input type="checkbox" id="autoRemoveBgBase" checked style="accent-color: #ffd54f; cursor: pointer;">
+              ✨ ลบพื้นหลังรูปอัปโหลดอัตโนมัติ
+            </label>
           </div>
-          <button class="btn-glass random-krathong-btn" id="btnRandomKrathong" type="button">🎲 สุ่มแบบกระทงให้ฉัน</button>
           <div class="bases-grid" id="basesGrid"></div>
           <input type="file" id="baseUploadInput" accept="image/*" style="display: none;">
         </div>
@@ -168,7 +185,11 @@
             </div>
           </div>
 
-          <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap;">
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #ffd54f; cursor: pointer;">
+              <input type="checkbox" id="autoRemoveBgDeco" checked style="accent-color: #ffd54f; cursor: pointer;">
+              ✨ ลบพื้นหลังรูปอัปโหลดอัตโนมัติ
+            </label>
             <button class="btn-glass" id="btnClearAllDeco" style="font-size: 11px; padding: 4px 10px;">
               ล้างของตกแต่งทั้งหมด
             </button>
@@ -183,71 +204,24 @@
           </div>
 
           <div class="form-group">
-            <label class="couple-toggle">
-              <input type="checkbox" id="coupleModeInput">
-              <span>💞 ลอยกระทงแบบคู่</span>
-            </label>
-            <div id="partnerNameGroup" class="partner-name-group" hidden>
-              <label class="form-label" for="partnerNameInput">ชื่อคู่ของคุณ:</label>
-              <input type="text" class="form-input" id="partnerNameInput" placeholder="ชื่อผู้ร่วมลอยกระทง" maxlength="30">
-              <small>กรอกชื่อของทั้งสองคนเพื่อร่วมลอยกระทงหนึ่งใบ</small>
-            </div>
-          </div>
-
-          <div class="form-group">
             <label class="form-label" for="wishTextInput">คำอธิษฐาน & ขอขมาพระแม่คงคา:</label>
             <div class="quick-wishes-tags" id="quickWishTags"></div>
+            <div class="short-wishes-header">
+              <span>✨ เลือกคำอธิษฐานของคุณ</span>
+              <span class="short-wishes-sub">(เลือกได้มากกว่า 1 ข้อ)</span>
+            </div>
+            <div class="short-wishes-grid" id="shortWishesGrid"></div>
             <textarea class="form-textarea" id="wishTextInput" rows="4" placeholder="พิมพ์คำอธิษฐานของคุณ หรือคลิกเลือกข้อความมงคลด้านบน..."></textarea>
           </div>
           <div class="form-group">
-            <label class="form-label" for="privacySelect">ความเป็นส่วนตัว:</label>
-            <select class="form-input" id="privacySelect">
-              <option value="public">แสดงชื่อและคำอธิษฐาน</option>
-              <option value="anonymous">แสดงคำอธิษฐาน แต่ไม่แสดงชื่อ</option>
-              <option value="private">ไม่แสดงชื่อและคำอธิษฐานแก่ผู้อื่น</option>
+            <label class="form-label" for="visibilityInput">การแสดงผล:</label>
+            <select class="form-input" id="visibilityInput">
+              <option value="public">สาธารณะ: แสดงชื่อและคำอธิษฐาน</option>
+              <option value="anonymous">ไม่ระบุชื่อ: แสดงคำอธิษฐาน</option>
+              <option value="private">ส่วนตัว: เก็บบนคลาวด์ เห็นได้จากเบราว์เซอร์นี้</option>
             </select>
-            <small class="privacy-note">ข้อมูลกระทงบันทึกในเบราว์เซอร์นี้เท่านั้น</small>
           </div>
         </div>
-
-        <!-- STEP 4: CONFIRMATION & SUMMARY -->
-        <div class="wizard-step-view" data-step="4" style="display: none;">
-
-          <div class="confirmation-summary">
-
-            <h3>🪷 ตรวจสอบกระทงของคุณ</h3>
-            <p>ตรวจสอบรายละเอียดก่อนนำกระทงลงสู่สายน้ำ</p>
-
-            <div class="summary-preview">
-              <canvas id="summaryCanvas" width="480" height="360"></canvas>
-            </div>
-
-            <div class="summary-info">
-              <div class="summary-label">👤 ผู้ลอยกระทง</div>
-              <div class="summary-value" id="summaryOwnerName">ยังไม่ได้ระบุชื่อ</div>
-            </div>
-            <div class="summary-info">
-              <div class="summary-label">🙏 คำอธิษฐาน</div>
-              <div class="summary-value" id="summaryWish">ยังไม่ได้ระบุคำอธิษฐาน</div>
-            </div>
-            <div class="summary-info">
-              <div class="summary-label">🔒 การแสดงผล</div>
-              <div class="summary-value" id="summaryPrivacy"></div>
-            </div>
-            <div class="summary-share-actions">
-              <button class="btn-glass" id="btnShareKrathong" type="button">📤 แชร์ภาพกระทง</button>
-              <button class="btn-glass" id="btnDownloadKrathong" type="button">🖼️ บันทึกภาพกระทง</button>
-            </div>
-
-            <div class="summary-notice">
-              ✨ ตรวจสอบข้อมูลเรียบร้อยแล้ว
-              <br>
-              พร้อมส่งกระทงของคุณลอยไปกับสายน้ำ
-            </div>
-          </div>
-
-        </div>
-
       </div>
 
       <div class="modal-footer">
@@ -343,15 +317,15 @@
     <div class="modal-box">
       <div class="modal-header">
         <div class="modal-title" id="backupTitle">
-          <span>💾</span>
-          <span>สำรองและกู้คืนข้อมูล (Backup & Restore)</span>
+        <span>💾</span>
+        <span>สำรองและกู้คืนข้อมูลในเครื่อง</span>
         </div>
         <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
       </div>
 
       <div class="modal-body">
         <div style="font-size: 13px; line-height: 1.6; color: #cfd8dc; margin-bottom: 18px;">
-          ระบบจะเก็บข้อมูลทั้งหมด (รูปฐานกระทงที่อัปโหลด, ของตกแต่ง, ฉากหลัง, และกระทงที่ลอยแล้วทั้งหมด) บันทึกไว้ในเครื่องของคุณ (IndexedDB)
+          ไฟล์นี้สำรองเฉพาะข้อมูลในเบราว์เซอร์ของคุณ เช่น รูปที่อัปโหลดและฉากหลัง ผลงานที่ส่งขึ้น Cloudflare ไม่รวมอยู่ในไฟล์นี้
           คุณสามารถส่งออกไฟล์สำรอง (JSON) เพื่อนำไปใช้งานข้ามเครื่อง หรือกู้คืนข้อมูลได้ตลอดเวลา:
         </div>
 
@@ -379,13 +353,48 @@
   </div>
 
   <!-- ========================================================================
+       MODAL 5: DRAW WINNER POPUP
+       ======================================================================== -->
+  <div class="modal-overlay" id="winnerModal" role="dialog" aria-modal="true" aria-labelledby="winnerModalTitle">
+    <div class="modal-box winner-modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="winnerModalTitle">
+          <span>🏆</span>
+          <span>ผลการสุ่มรางวัลผู้ร่วมกิจกรรม</span>
+        </div>
+        <button class="modal-close-btn" title="ปิดหน้าต่าง">✕</button>
+      </div>
+
+      <div class="modal-body winner-modal-body">
+        <div class="winner-badge" id="winnerModeBadge" hidden>โหมดทดลอง (30 รายชื่อตัวอย่าง)</div>
+        <div class="winner-trophy" aria-hidden="true">🎁</div>
+        <div class="winner-congrats" id="winnerModalSubtitle">ขอแสดงความยินดี ผู้ได้รับรางวัล</div>
+        <div class="winner-name" id="winnerModalName">-</div>
+        <div class="winner-meta" id="winnerModalMeta"></div>
+
+        <div class="winner-history" id="winnerHistorySection" hidden>
+          <div class="winner-history-title">รายชื่อผู้ได้รับรางวัลล่าสุด</div>
+          <ul class="winner-history-list" id="winnerHistoryList"></ul>
+        </div>
+      </div>
+
+      <div class="modal-footer winner-modal-footer">
+        <button class="btn-glass" id="winnerDrawNextBtn" type="button">🎲 สุ่มรางวัลถัดไป</button>
+        <button class="btn-float-cta" type="button" data-modal-close>ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
        APPLICATION JAVASCRIPT MODULES
        ======================================================================== -->
-  <script src="js/db.js"></script>
-  <script src="js/theme.js"></script>
-  <script src="js/assets.js"></script>
-  <script src="js/editor.js"></script>
-  <script src="js/river.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/db.js?v=4"></script>
+  <script src="js/assets.js?v=4"></script>
+  <script src="js/editor.js?v=4"></script>
+  <script src="js/river.js?v=5"></script>
+  <script src="js/cloud.js?v=2"></script>
+  <script src="js/music.js?v=1"></script>
+  <script src="js/draw.js?v=3"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

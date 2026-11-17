@@ -48,7 +48,9 @@ class KrathongEditor {
   loadImage(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (src && /^https?:\/\//i.test(src) && !src.startsWith(window.location.origin)) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => resolve(img);
       img.onerror = (e) => reject(e);
       img.src = src;
@@ -64,8 +66,11 @@ class KrathongEditor {
 
     try {
       const img = await this.loadImage(src);
-      const baseWidth = 320;
-      const baseHeight = (img.height / img.width) * baseWidth;
+      const maxW = 320;
+      const maxH = 245;
+      const ratio = Math.min(maxW / img.width, maxH / img.height);
+      const baseWidth = Math.round(img.width * ratio);
+      const baseHeight = Math.round(img.height * ratio);
 
       this.base = {
         id: baseAssetOrCustom.id,
@@ -74,7 +79,7 @@ class KrathongEditor {
         src: src,
         imgElement: img,
         x: this.width / 2,
-        y: this.height / 2 + 50,
+        y: this.height / 2 + 35,
         width: baseWidth,
         height: baseHeight,
         scale: 1,

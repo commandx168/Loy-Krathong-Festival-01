@@ -24,6 +24,7 @@ class RiverScene {
     // Simulation entities
     this.krathongs = []; // Active floating krathongs on screen
     this.allKrathongs = []; // All stored krathongs in database
+    this.nextKrathongIndex = 0;
     this.lanterns = []; // Sky lanterns
     this.fireworks = []; // Fireworks particles
     this.waterRipples = []; // Expanding ripples
@@ -61,7 +62,9 @@ class RiverScene {
     this.canvas.height = this.height * this.dpr;
     this.canvas.style.width = this.width + 'px';
     this.canvas.style.height = this.height + 'px';
-    this.ctx.scale(this.dpr, this.dpr);
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
 
     this.waterlineY = (this.height * this.waterlineHeight) / 100;
   }
@@ -77,7 +80,7 @@ class RiverScene {
       if (k.depthTier === 1) { minR = 0.42; maxR = 0.68; }
       else if (k.depthTier === 2) { minR = 0.72; maxR = 0.88; }
       const newCalculatedY = this.waterlineY + waterDepth * ((minR + maxR) / 2);
-      k.baseY = Math.max(this.waterlineY + 30, Math.min(this.height - 40, newCalculatedY));
+      k.baseY = Math.max(this.waterlineY + 30, Math.min(this.height - k.height * 0.5 - 38, newCalculatedY));
       k.y = k.baseY;
     }
   }
@@ -88,6 +91,50 @@ class RiverScene {
 
   setBackground(bgImageOrPreset) {
     this.currentBackground = bgImageOrPreset;
+    this.foregroundOverlays = null;
+  }
+
+  drawForegroundKrathongs() {
+    const background = this.currentBackground;
+    if (!background?.isDefault || !background.imgElement) return;
+    const img = background.imgElement;
+    const imageWidth = img.naturalWidth;
+    const imageHeight = img.naturalHeight;
+    if (!imageWidth || !imageHeight) return;
+
+    if (!this.foregroundOverlays) {
+      this.foregroundOverlays = [
+        { x: 0, y: 735, width: 220, height: 185, centerX: 105 },
+        { x: imageWidth - 220, y: 735, width: 220, height: 185, centerX: 115 }
+      ].map((region) => {
+        const layer = document.createElement('canvas');
+        layer.width = region.width;
+        layer.height = region.height;
+        const ctx = layer.getContext('2d');
+        ctx.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height);
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = region.width;
+        maskCanvas.height = region.height;
+        const maskCtx = maskCanvas.getContext('2d');
+        maskCtx.translate(region.centerX, 93);
+        maskCtx.scale(1, 0.85);
+        const mask = maskCtx.createRadialGradient(0, 0, 65, 0, 0, 108);
+        mask.addColorStop(0, '#fff');
+        mask.addColorStop(1, 'transparent');
+        maskCtx.fillStyle = mask;
+        maskCtx.fillRect(-120, -120, 240, 240);
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(maskCanvas, 0, 0);
+        return { ...region, layer };
+      });
+    }
+
+    const scale = Math.max(this.width / imageWidth, this.height / imageHeight);
+    const offsetX = (this.width - imageWidth * scale) / 2;
+    const offsetY = (this.height - imageHeight * scale) / 2;
+    for (const region of this.foregroundOverlays) {
+      this.ctx.drawImage(region.layer, offsetX + region.x * scale, offsetY + region.y * scale, region.width * scale, region.height * scale);
+    }
   }
 
   // --- SEED SAMPLE KRATHONGS IF DATABASE EMPTY ---
@@ -188,8 +235,9 @@ class RiverScene {
 
   async loadKrathongs(krathongsList) {
     this.allKrathongs = krathongsList || [];
+    this.nextKrathongIndex = Math.min(this.allKrathongs.length, 12);
     if (this.onCountChange) {
-      this.onCountChange(this.countFloatedKrathongs());
+      this.onCountChange(this.allKrathongs.length);
     }
 
     // Populate active river krathongs
@@ -202,10 +250,6 @@ class RiverScene {
         initialProgress: Math.random() * this.width
       });
     }
-  }
-
-  countFloatedKrathongs() {
-    return this.allKrathongs.filter((krathong) => !String(krathong.id).startsWith('sample_')).length;
   }
 
   async getCachedImage(srcOrSvg) {
@@ -232,7 +276,7 @@ class RiverScene {
       img = await this.getCachedImage(data.imageData);
     } else if (data.baseId) {
       const baseAsset = KRATHONG_ASSETS.bases.find((b) => b.id === data.baseId) || KRATHONG_ASSETS.bases[0];
-      img = await this.getCachedImage(svgToDataUrl(baseAsset.svg));
+      img = await this.getCachedImage(baseAsset.src || svgToDataUrl(baseAsset.svg));
     }
 
     if (!img) return null;
@@ -246,39 +290,33 @@ class RiverScene {
     let scale, minRatio, maxRatio, speed;
     if (depthTier === 0) {
       // Far (ไกล - อยู่ติดใต้ขอบผิวน้ำลงมาพอดี ไม่ลอยเกยขึ้นไปบนฝั่ง/ท้องฟ้า)
-      scale = 0.35 + Math.random() * 0.08; // 0.35 - 0.43
+      scale = 0.92 + Math.random() * 0.04; // Slightly smaller near the pier
       minRatio = 0.16; // ลงมา 16% ของแม่น้ำ (พ้นขอบตลิ่ง)
       maxRatio = 0.38;
       speed = 0.20 + Math.random() * 0.10;
     } else if (depthTier === 1) {
       // Mid (กลาง - ลอยช่วงกลางลำน้ำ)
-      scale = 0.50 + Math.random() * 0.10; // 0.50 - 0.60
+      scale = 1.04 + Math.random() * 0.05;
       minRatio = 0.42;
       maxRatio = 0.68;
       speed = 0.32 + Math.random() * 0.14;
     } else {
       // Near (ใกล้ - ลอยริมน้ำด้านหน้า)
-      scale = 0.70 + Math.random() * 0.15; // 0.70 - 0.85
+      scale = 1.15 + Math.random() * 0.05; // Similar visible size to the foreground krathongs in the scene
       minRatio = 0.72;
       maxRatio = 0.88; // ไม่จมขอบจอล่าง
       speed = 0.45 + Math.random() * 0.18;
     }
 
     const calculatedY = this.waterlineY + waterDepth * (minRatio + Math.random() * (maxRatio - minRatio));
-    const baseY = Math.max(this.waterlineY + 30, Math.min(this.height - 40, calculatedY));
+    const objectHeight = 125 * scale;
+    const baseY = Math.max(this.waterlineY + 30, Math.min(this.height - objectHeight * 0.5 - 38, calculatedY));
     const startX = options.initialProgress !== undefined ? options.initialProgress : -160;
 
     const floatingObj = {
       id: data.id,
-      name: data.privacy === 'private'
-        ? 'กระทงส่วนตัว'
-        : data.privacy === 'anonymous'
-          ? 'ไม่ประสงค์ออกนาม'
-          : data.name || 'ผู้ไม่ประสงค์ออกนาม',
-      wish: data.privacy === 'private'
-        ? 'คำอธิษฐานนี้เป็นส่วนตัว'
-        : data.wish || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี',
-      privacy: data.privacy || 'public',
+      name: data.name || 'ผู้ไม่ประสงค์ออกนาม',
+      wish: data.wish || 'ขอขมาพระแม่คงคา สุขกายสบายใจตลอดปี',
       timestamp: data.timestamp || Date.now(),
       imgElement: img,
       imageData: data.imageData,
@@ -288,6 +326,7 @@ class RiverScene {
       depthTier: depthTier,
       scale: scale,
       speed: speed,
+      currentSpeedMult: 1,
       width: 180 * scale,
       height: 125 * scale,
       bobAmp: 1.0 + depthTier * 0.6, // ลดระยะกระเพื่อมขึ้นลง เหลือ 1.0 - 2.2px นิ่งสงบ
@@ -310,7 +349,7 @@ class RiverScene {
   async launchNewKrathong(krathongData) {
     this.allKrathongs.unshift(krathongData);
     if (this.onCountChange) {
-      this.onCountChange(this.countFloatedKrathongs());
+      this.onCountChange(this.allKrathongs.length);
     }
 
     const newObj = await this.spawnFloatingKrathong(krathongData, {
@@ -321,7 +360,7 @@ class RiverScene {
 
     if (newObj) {
       const waterDepth = this.height - this.waterlineY;
-      newObj.baseY = Math.min(this.height - 45, this.waterlineY + waterDepth * 0.82);
+      newObj.baseY = Math.min(this.height - newObj.height * 0.5 - 38, this.waterlineY + waterDepth * 0.82);
       newObj.y = newObj.baseY;
 
       // Create expanding water ripples
@@ -518,9 +557,11 @@ class RiverScene {
   }
 
   update(now, dt) {
+    const dtFactor = Math.min(dt, 50) / 16.6667; // Frame-rate independent multiplier (normalized to 60fps)
+
     // 1. Update Sky Lanterns
     for (const lantern of this.lanterns) {
-      lantern.y += lantern.speedY;
+      lantern.y += lantern.speedY * dtFactor;
       lantern.x = lantern.baseX + Math.sin(now * lantern.swaySpeed + lantern.swayPhase) * lantern.swayAmp;
       if (lantern.y < -30) {
         // Reset to horizon
@@ -532,12 +573,13 @@ class RiverScene {
     // 2. Update Fireworks Particles
     for (let i = this.fireworks.length - 1; i >= 0; i--) {
       const p = this.fireworks[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += p.gravity;
-      p.vx *= p.friction;
-      p.vy *= p.friction;
-      p.alpha -= p.decay;
+      p.x += p.vx * dtFactor;
+      p.y += p.vy * dtFactor;
+      p.vy += p.gravity * dtFactor;
+      const frictionPow = Math.pow(p.friction, dtFactor);
+      p.vx *= frictionPow;
+      p.vy *= frictionPow;
+      p.alpha -= p.decay * dtFactor;
       if (p.alpha <= 0) {
         this.fireworks.splice(i, 1);
       }
@@ -546,9 +588,9 @@ class RiverScene {
     // 3. Update Ripples
     for (let i = this.waterRipples.length - 1; i >= 0; i--) {
       const r = this.waterRipples[i];
-      r.rx += r.expandSpeed * 1.5;
-      r.ry += r.expandSpeed * 0.45;
-      r.alpha -= 0.008;
+      r.rx += r.expandSpeed * 1.5 * dtFactor;
+      r.ry += r.expandSpeed * 0.45 * dtFactor;
+      r.alpha -= 0.008 * dtFactor;
       if (r.alpha <= 0 || r.rx >= r.maxRx) {
         this.waterRipples.splice(i, 1);
       }
@@ -556,38 +598,39 @@ class RiverScene {
 
     // 4. Update Floating Krathongs
     for (const k of this.krathongs) {
-      // Gentle drift downstream (left to right)
-      // Slight pause or slowdown when hovered
-      const currentSpeed = (this.hoveredKrathong === k) ? k.speed * 0.3 : k.speed;
-      k.x += currentSpeed;
+      // Smoothly ease speed when hovered / unhovered
+      const targetMult = (this.hoveredKrathong === k || this.activeBubbleKrathong === k) ? 0.22 : 1.0;
+      k.currentSpeedMult = (k.currentSpeedMult !== undefined ? k.currentSpeedMult : 1.0);
+      k.currentSpeedMult += (targetMult - k.currentSpeedMult) * Math.min(1, 0.08 * dtFactor);
 
-      // Sinusoidal bobbing
+      k.x += k.speed * k.currentSpeedMult * dtFactor;
+
+      // Ultra-smooth sinusoidal bobbing & gentle tilt
       k.y = k.baseY + Math.sin(now * k.bobSpeed + k.bobPhase) * k.bobAmp;
       k.currentTilt = Math.sin(now * k.tiltSpeed + k.tiltPhase) * k.tiltAmp;
 
-      // Wrap around when off-screen to the right
-      if (k.x > this.width + 160) {
-        k.x = -160;
-        // Occasionally pick a different random krathong from allKrathongs pool
+      // Wrap around smoothly when completely off-screen to the right
+      const wrapMargin = Math.max(180, k.width + 60);
+      if (k.x > this.width + wrapMargin) {
+        k.x = -wrapMargin;
+        // Cycle through every stored krathong before showing one again.
         if (this.allKrathongs.length > this.krathongs.length) {
-          const randomIdx = Math.floor(Math.random() * this.allKrathongs.length);
-          const freshData = this.allKrathongs[randomIdx];
-          k.id = freshData.id;
-          k.name = freshData.privacy === 'private'
-            ? 'กระทงส่วนตัว'
-            : freshData.privacy === 'anonymous'
-              ? 'ไม่ประสงค์ออกนาม'
-              : freshData.name;
-          k.wish = freshData.privacy === 'private'
-            ? 'คำอธิษฐานนี้เป็นส่วนตัว'
-            : freshData.wish;
-          k.privacy = freshData.privacy || 'public';
-          k.timestamp = freshData.timestamp;
-          if (freshData.imageData) {
-            this.getCachedImage(freshData.imageData).then((img) => {
-              if (img) k.imgElement = img;
-            });
-          }
+          const freshData = this.allKrathongs[this.nextKrathongIndex % this.allKrathongs.length];
+          this.nextKrathongIndex++;
+          const source = freshData.imageData || (() => {
+            const base = KRATHONG_ASSETS.bases.find((b) => b.id === freshData.baseId) || KRATHONG_ASSETS.bases[0];
+            return base.src || svgToDataUrl(base.svg);
+          })();
+          const nextId = freshData.id;
+          k.pendingId = nextId;
+          this.getCachedImage(source).then((img) => {
+            if (!img || k.pendingId !== nextId) return;
+            k.id = nextId;
+            k.name = freshData.name;
+            k.wish = freshData.wish;
+            k.timestamp = freshData.timestamp;
+            k.imgElement = img;
+          });
         }
       }
     }
@@ -612,18 +655,25 @@ class RiverScene {
 
     // 5. Draw Krathongs & Water Reflections
     this.drawKrathongs(now);
+    this.drawForegroundKrathongs();
   }
 
   drawSkyBackground(now) {
     if (this.currentBackground && this.currentBackground.imgElement) {
-      // Custom uploaded background
-      this.ctx.drawImage(
-        this.currentBackground.imgElement,
-        0,
-        0,
-        this.width,
-        this.height
-      );
+      // Custom or default image background (aspect-ratio cover fit)
+      const img = this.currentBackground.imgElement;
+      const imgW = img.naturalWidth || img.width;
+      const imgH = img.naturalHeight || img.height;
+      if (imgW > 0 && imgH > 0) {
+        const scale = Math.max(this.width / imgW, this.height / imgH);
+        const drawW = imgW * scale;
+        const drawH = imgH * scale;
+        const offsetX = (this.width - drawW) / 2;
+        const offsetY = (this.height - drawH) / 2;
+        this.ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+      } else {
+        this.ctx.drawImage(img, 0, 0, this.width, this.height);
+      }
     } else {
       // Default festive Thai twilight panorama
       // Sky gradient
@@ -796,33 +846,37 @@ class RiverScene {
 
     this.ctx.save();
 
-    // River Base Gradient (Dark flowing water)
-    const waterGrad = this.ctx.createLinearGradient(0, this.waterlineY, 0, this.height);
-    waterGrad.addColorStop(0, '#0d1d36');
-    waterGrad.addColorStop(0.35, '#09152b');
-    waterGrad.addColorStop(0.7, '#040b17');
-    waterGrad.addColorStop(1, '#02060c');
-    this.ctx.fillStyle = waterGrad;
-    this.ctx.fillRect(0, this.waterlineY, this.width, waterHeight);
+    const hasImageBg = Boolean(this.currentBackground && this.currentBackground.imgElement);
 
-    // Golden Moon Water Reflection Beam (แสงจันทร์พาดผ่านสายน้ำ)
-    const moonX = this.width * 0.78;
-    const moonReflect = this.ctx.createLinearGradient(0, this.waterlineY, 0, this.height);
-    moonReflect.addColorStop(0, 'rgba(255, 236, 179, 0.45)');
-    moonReflect.addColorStop(0.4, 'rgba(255, 193, 7, 0.22)');
-    moonReflect.addColorStop(1, 'rgba(255, 160, 0, 0.05)');
+    if (!hasImageBg) {
+      // River Base Gradient (Dark flowing water) for procedural background
+      const waterGrad = this.ctx.createLinearGradient(0, this.waterlineY, 0, this.height);
+      waterGrad.addColorStop(0, '#0d1d36');
+      waterGrad.addColorStop(0.35, '#09152b');
+      waterGrad.addColorStop(0.7, '#040b17');
+      waterGrad.addColorStop(1, '#02060c');
+      this.ctx.fillStyle = waterGrad;
+      this.ctx.fillRect(0, this.waterlineY, this.width, waterHeight);
 
-    this.ctx.fillStyle = moonReflect;
-    this.ctx.beginPath();
-    this.ctx.moveTo(moonX - 25, this.waterlineY);
-    this.ctx.lineTo(moonX + 25, this.waterlineY);
-    this.ctx.lineTo(moonX + 160, this.height);
-    this.ctx.lineTo(moonX - 160, this.height);
-    this.ctx.closePath();
-    this.ctx.fill();
+      // Golden Moon Water Reflection Beam (แสงจันทร์พาดผ่านสายน้ำ)
+      const moonX = this.width * 0.78;
+      const moonReflect = this.ctx.createLinearGradient(0, this.waterlineY, 0, this.height);
+      moonReflect.addColorStop(0, 'rgba(255, 236, 179, 0.45)');
+      moonReflect.addColorStop(0.4, 'rgba(255, 193, 7, 0.22)');
+      moonReflect.addColorStop(1, 'rgba(255, 160, 0, 0.05)');
+
+      this.ctx.fillStyle = moonReflect;
+      this.ctx.beginPath();
+      this.ctx.moveTo(moonX - 25, this.waterlineY);
+      this.ctx.lineTo(moonX + 25, this.waterlineY);
+      this.ctx.lineTo(moonX + 160, this.height);
+      this.ctx.lineTo(moonX - 160, this.height);
+      this.ctx.closePath();
+      this.ctx.fill();
+    }
 
     // Shimmering horizontal wave ripples (คลื่นผิวน้ำ นิ่งสงบ สบายตา)
-    this.ctx.strokeStyle = 'rgba(128, 222, 234, 0.12)';
+    this.ctx.strokeStyle = hasImageBg ? 'rgba(178, 235, 242, 0.14)' : 'rgba(128, 222, 234, 0.12)';
     this.ctx.lineWidth = 1.0;
     const waveRows = 10;
     for (let r = 0; r < waveRows; r++) {
@@ -832,7 +886,7 @@ class RiverScene {
       const waveFreq = 0.012 - r * 0.0005;
 
       this.ctx.beginPath();
-      for (let x = 0; x <= this.width; x += 20) {
+      for (let x = 0; x <= this.width; x += 10) {
         const y = rowY + Math.sin(x * waveFreq + now * waveSpeed) * waveAmp;
         if (x === 0) this.ctx.moveTo(x, y);
         else this.ctx.lineTo(x, y);
@@ -925,11 +979,7 @@ class RiverScene {
     this.ctx.save();
     const tagY = k.height * 0.52 + 10;
     const maxChars = 14;
-    const displayName = k.privacy === 'private'
-      ? 'กระทงส่วนตัว'
-      : k.privacy === 'anonymous'
-        ? 'ไม่ประสงค์ออกนาม'
-        : k.name.length > maxChars ? k.name.substring(0, maxChars) + '…' : k.name;
+    const displayName = k.name.length > maxChars ? k.name.substring(0, maxChars) + '…' : k.name;
 
     // Measurement
     this.ctx.font = `600 ${Math.max(10, Math.round(11 * k.scale))}px "Kanit", sans-serif`;

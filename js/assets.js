@@ -420,6 +420,34 @@ const KRATHONG_ASSETS = {
   <ellipse cx="140" cy="110" rx="35" ry="6" fill="#ffffff" opacity="0.55"/>
   <circle cx="170" cy="112" r="3" fill="#ffffff" opacity="0.7"/>
 </svg>`
+    },
+    {
+      id: 'base_royal_lotus_pink',
+      name: 'กระทงบัวหลวงชมพู',
+      tag: 'ต้นแบบใหม่ ๑',
+      description: 'กระทงใบตองพับกลีบวิจิตร ประดับกลีบบัวหลวงชมพูและดอกมะลิ (ไม่มีฉากหลัง)',
+      src: 'assets/krathongs/krathong_lotus_pink.png'
+    },
+    {
+      id: 'base_royal_orchid_purple',
+      name: 'กระทงกล้วยไม้ม่วง-ขาว',
+      tag: 'ต้นแบบใหม่ ๒',
+      description: 'กระทงใบตองประดับกล้วยไม้ไทยสีม่วง-ขาวและดอกดาวเรือง (ไม่มีฉากหลัง)',
+      src: 'assets/krathongs/krathong_orchid_purple.png'
+    },
+    {
+      id: 'base_royal_rose_red',
+      name: 'กระทงพุ่มกุหลาบแดง',
+      tag: 'ต้นแบบใหม่ ๓',
+      description: 'กระทงใบตองทรงพุ่มสูง ประดับกุหลาบแดงและบานไม่รู้โรย (ไม่มีฉากหลัง)',
+      src: 'assets/krathongs/krathong_rose_red.png'
+    },
+    {
+      id: 'base_royal_jasmine_marigold',
+      name: 'กระทงมาลัยมะลิ-ดาวเรือง',
+      tag: 'ต้นแบบใหม่ ๔',
+      description: 'กระทงใบตองประดับมาลัยดอกมะลิ ดอกรัก และดาวเรืองทอง (ไม่มีฉากหลัง)',
+      src: 'assets/krathongs/krathong_jasmine_marigold.png'
     }
   ],
 

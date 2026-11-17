@@ -1,0 +1,12 @@
+{
+  "name": "bkeetc-loykrathong",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-11-16",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bkeetc-loykrathong",
+      "database_id": "1fcc297f-828e-45f6-a0d4-08dca9feb91b"
+    }
+  ]
+}
