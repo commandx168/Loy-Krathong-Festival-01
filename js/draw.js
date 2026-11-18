@@ -28,17 +28,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!panel || !toggleBtn) return;
     panel.classList.toggle('is-collapsed', collapsed);
     toggleBtn.setAttribute('aria-expanded', String(!collapsed));
-    toggleBtn.textContent = collapsed ? '▴' : '▾';
+    toggleBtn.textContent = collapsed ? '▾' : '▴';
   };
 
   if (panel && toggleBtn) {
-    setCollapsed(window.matchMedia('(max-width: 768px)').matches);
+    setCollapsed(true);
     toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       setCollapsed(!panel.classList.contains('is-collapsed'));
     });
     panel.querySelector('.reward-panel-header')?.addEventListener('click', () => {
-      if (panel.classList.contains('is-collapsed')) setCollapsed(false);
+      setCollapsed(!panel.classList.contains('is-collapsed'));
+    });
+    document.addEventListener('click', (e) => {
+      if (!panel.classList.contains('is-collapsed') && !panel.contains(e.target)) {
+        setCollapsed(true);
+      }
     });
   }
 

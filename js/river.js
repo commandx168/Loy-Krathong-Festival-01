@@ -67,6 +67,12 @@ class RiverScene {
     this.ctx.imageSmoothingQuality = 'high';
 
     this.waterlineY = (this.height * this.waterlineHeight) / 100;
+
+    for (const k of this.krathongs) {
+      const { minY, maxY } = this.getTierYBounds(k.depthTier, k.height);
+      k.baseY = Math.max(minY, Math.min(maxY, k.baseY));
+      k.y = k.baseY;
+    }
   }
 
   setWaterline(percent) {
@@ -74,15 +80,71 @@ class RiverScene {
     this.waterlineY = (this.height * this.waterlineHeight) / 100;
 
     // อัปเดตตำแหน่ง Y ของกระทงที่มีอยู่เดิมทันที ไม่ให้ลอยหลุดขอบผิวน้ำใหม่
-    const waterDepth = this.height - this.waterlineY;
     for (const k of this.krathongs) {
-      let minR = 0.16, maxR = 0.38;
-      if (k.depthTier === 1) { minR = 0.42; maxR = 0.68; }
-      else if (k.depthTier === 2) { minR = 0.72; maxR = 0.88; }
-      const newCalculatedY = this.waterlineY + waterDepth * ((minR + maxR) / 2);
-      k.baseY = Math.max(this.waterlineY + 30, Math.min(this.height - k.height * 0.5 - 38, newCalculatedY));
+      const { minY, maxY } = this.getTierYBounds(k.depthTier, k.height);
+      k.baseY = (minY + maxY) / 2;
       k.y = k.baseY;
     }
+  }
+
+  getMaxVisibleKrathongs() {
+    if (this.width < 640) return 6;
+    if (this.width < 1024) return 9;
+    return 12;
+  }
+
+  getTierConfig(depthTier) {
+    if (depthTier === 0) {
+      return { minRatio: 0.16, maxRatio: 0.38, scaleMin: 0.92, scaleMax: 0.96, speedMin: 0.20, speedMax: 0.30 };
+    }
+    if (depthTier === 1) {
+      return { minRatio: 0.42, maxRatio: 0.68, scaleMin: 1.04, scaleMax: 1.09, speedMin: 0.32, speedMax: 0.46 };
+    }
+    return { minRatio: 0.72, maxRatio: 0.88, scaleMin: 1.15, scaleMax: 1.20, speedMin: 0.45, speedMax: 0.63 };
+  }
+
+  getTierYBounds(depthTier, objectHeight) {
+    const waterDepth = Math.max(80, this.height - this.waterlineY);
+    const cfg = this.getTierConfig(depthTier);
+    const minAllowed = this.waterlineY + 30;
+    const maxAllowed = Math.max(minAllowed + 10, this.height - objectHeight * 0.5 - 38);
+    const minY = Math.max(minAllowed, Math.min(maxAllowed, this.waterlineY + waterDepth * cfg.minRatio));
+    const maxY = Math.max(minY, Math.min(maxAllowed, this.waterlineY + waterDepth * cfg.maxRatio));
+    return { minY, maxY };
+  }
+
+  findClearY(depthTier, targetX, objectHeight, excludeKrathong = null) {
+    const { minY, maxY } = this.getTierYBounds(depthTier, objectHeight);
+    if (maxY - minY < 4) return minY;
+
+    const candidates = 7;
+    let bestY = minY + Math.random() * (maxY - minY);
+    let bestScore = -Infinity;
+
+    for (let i = 0; i < candidates; i++) {
+      const ratio = i / (candidates - 1);
+      const jitter = (Math.random() - 0.5) * ((maxY - minY) / candidates) * 0.4;
+      const candY = Math.max(minY, Math.min(maxY, minY + (maxY - minY) * ratio + jitter));
+
+      let minClearance = Infinity;
+      for (const other of this.krathongs) {
+        if (other === excludeKrathong) continue;
+        const dx = Math.abs(other.x - targetX);
+        if (dx > 240) continue;
+        const dy = Math.abs(other.baseY - candY);
+        const normDist = Math.hypot(dx / 200, dy / 140);
+        if (normDist < minClearance) {
+          minClearance = normDist;
+        }
+      }
+
+      if (minClearance > bestScore) {
+        bestScore = minClearance;
+        bestY = candY;
+      }
+    }
+
+    return bestY;
   }
 
   setReflectionOpacity(val) {
@@ -235,19 +297,21 @@ class RiverScene {
 
   async loadKrathongs(krathongsList) {
     this.allKrathongs = krathongsList || [];
-    this.nextKrathongIndex = Math.min(this.allKrathongs.length, 12);
+    const spawnCount = Math.min(this.allKrathongs.length, this.getMaxVisibleKrathongs());
+    this.nextKrathongIndex = spawnCount;
     if (this.onCountChange) {
       this.onCountChange(this.allKrathongs.length);
     }
 
-    // Populate active river krathongs
+    // Populate active river krathongs spread evenly across lanes and width
     this.krathongs = [];
-    // Spawn up to 12 simultaneous krathongs spread out across the river
-    const spawnCount = Math.min(this.allKrathongs.length, 12);
+    const slotWidth = (this.width + 80) / Math.max(1, spawnCount);
     for (let i = 0; i < spawnCount; i++) {
       const data = this.allKrathongs[i % this.allKrathongs.length];
+      const jitter = (Math.random() - 0.5) * slotWidth * 0.3;
       await this.spawnFloatingKrathong(data, {
-        initialProgress: Math.random() * this.width
+        depthTier: i % 3,
+        initialProgress: -20 + i * slotWidth + jitter
       });
     }
   }
@@ -283,35 +347,15 @@ class RiverScene {
 
     // Assign perspective depth: 0 = Far, 1 = Mid, 2 = Near
     const depthTier = options.depthTier !== undefined ? options.depthTier : Math.floor(Math.random() * 3);
+    const cfg = this.getTierConfig(depthTier);
+    const scale = cfg.scaleMin + Math.random() * (cfg.scaleMax - cfg.scaleMin);
+    const speed = cfg.speedMin + Math.random() * (cfg.speedMax - cfg.speedMin);
 
-    // คำนวณช่วงความสูงผิวน้ำที่มีอยู่จริงจาก this.waterlineY จนถึงขอบจอด้านล่าง (this.height)
-    const waterDepth = this.height - this.waterlineY;
-
-    let scale, minRatio, maxRatio, speed;
-    if (depthTier === 0) {
-      // Far (ไกล - อยู่ติดใต้ขอบผิวน้ำลงมาพอดี ไม่ลอยเกยขึ้นไปบนฝั่ง/ท้องฟ้า)
-      scale = 0.92 + Math.random() * 0.04; // Slightly smaller near the pier
-      minRatio = 0.16; // ลงมา 16% ของแม่น้ำ (พ้นขอบตลิ่ง)
-      maxRatio = 0.38;
-      speed = 0.20 + Math.random() * 0.10;
-    } else if (depthTier === 1) {
-      // Mid (กลาง - ลอยช่วงกลางลำน้ำ)
-      scale = 1.04 + Math.random() * 0.05;
-      minRatio = 0.42;
-      maxRatio = 0.68;
-      speed = 0.32 + Math.random() * 0.14;
-    } else {
-      // Near (ใกล้ - ลอยริมน้ำด้านหน้า)
-      scale = 1.15 + Math.random() * 0.05; // Similar visible size to the foreground krathongs in the scene
-      minRatio = 0.72;
-      maxRatio = 0.88; // ไม่จมขอบจอล่าง
-      speed = 0.45 + Math.random() * 0.18;
-    }
-
-    const calculatedY = this.waterlineY + waterDepth * (minRatio + Math.random() * (maxRatio - minRatio));
     const objectHeight = 125 * scale;
-    const baseY = Math.max(this.waterlineY + 30, Math.min(this.height - objectHeight * 0.5 - 38, calculatedY));
     const startX = options.initialProgress !== undefined ? options.initialProgress : -160;
+    const baseY = options.baseY !== undefined
+      ? options.baseY
+      : this.findClearY(depthTier, startX, objectHeight);
 
     const floatingObj = {
       id: data.id,
@@ -327,8 +371,10 @@ class RiverScene {
       scale: scale,
       speed: speed,
       currentSpeedMult: 1,
+      repelVx: 0,
+      repelVy: 0,
       width: 180 * scale,
-      height: 125 * scale,
+      height: objectHeight,
       bobAmp: 1.0 + depthTier * 0.6, // ลดระยะกระเพื่อมขึ้นลง เหลือ 1.0 - 2.2px นิ่งสงบ
       bobSpeed: 0.0012 + Math.random() * 0.0004,
       bobPhase: Math.random() * Math.PI * 2,
@@ -359,10 +405,6 @@ class RiverScene {
     });
 
     if (newObj) {
-      const waterDepth = this.height - this.waterlineY;
-      newObj.baseY = Math.min(this.height - newObj.height * 0.5 - 38, this.waterlineY + waterDepth * 0.82);
-      newObj.y = newObj.baseY;
-
       // Create expanding water ripples
       this.createRipple(newObj.x, newObj.y + 20);
 
@@ -596,43 +638,228 @@ class RiverScene {
       }
     }
 
-    // 4. Update Floating Krathongs
-    for (const k of this.krathongs) {
+    // 4. Update Floating Krathongs (with soft repulsion physics to prevent overlap)
+    this.applyKrathongRepulsion(dtFactor);
+
+    const maxVisible = this.getMaxVisibleKrathongs();
+    for (let i = this.krathongs.length - 1; i >= 0; i--) {
+      const k = this.krathongs[i];
+
       // Smoothly ease speed when hovered / unhovered
       const targetMult = (this.hoveredKrathong === k || this.activeBubbleKrathong === k) ? 0.22 : 1.0;
       k.currentSpeedMult = (k.currentSpeedMult !== undefined ? k.currentSpeedMult : 1.0);
       k.currentSpeedMult += (targetMult - k.currentSpeedMult) * Math.min(1, 0.08 * dtFactor);
 
-      k.x += k.speed * k.currentSpeedMult * dtFactor;
+      const baseVelX = k.speed * k.currentSpeedMult;
+      const effectiveVelX = Math.max(0.06, baseVelX + (k.repelVx || 0));
+      k.x += effectiveVelX * dtFactor;
 
-      // Ultra-smooth sinusoidal bobbing & gentle tilt
+      if (k.repelVy) {
+        const { minY, maxY } = this.getTierYBounds(k.depthTier, k.height);
+        const effectiveMinY = k.avoidingForeground ? Math.min(minY, this.waterlineY + 30) : minY;
+        k.baseY = Math.max(effectiveMinY, Math.min(maxY, k.baseY + k.repelVy * dtFactor));
+      }
+
+      // Ultra-smooth sinusoidal bobbing & gentle tilt (plus subtle turn tilt when steering)
       k.y = k.baseY + Math.sin(now * k.bobSpeed + k.bobPhase) * k.bobAmp;
-      k.currentTilt = Math.sin(now * k.tiltSpeed + k.tiltPhase) * k.tiltAmp;
+      const steerTilt = Math.max(-5, Math.min(5, (k.repelVy || 0) * 3.5));
+      k.currentTilt = Math.sin(now * k.tiltSpeed + k.tiltPhase) * k.tiltAmp + steerTilt;
 
       // Wrap around smoothly when completely off-screen to the right
       const wrapMargin = Math.max(180, k.width + 60);
       if (k.x > this.width + wrapMargin) {
-        k.x = -wrapMargin;
-        // Cycle through every stored krathong before showing one again.
-        if (this.allKrathongs.length > this.krathongs.length) {
-          const freshData = this.allKrathongs[this.nextKrathongIndex % this.allKrathongs.length];
-          this.nextKrathongIndex++;
-          const source = freshData.imageData || (() => {
-            const base = KRATHONG_ASSETS.bases.find((b) => b.id === freshData.baseId) || KRATHONG_ASSETS.bases[0];
-            return base.src || svgToDataUrl(base.svg);
-          })();
-          const nextId = freshData.id;
-          k.pendingId = nextId;
-          this.getCachedImage(source).then((img) => {
-            if (!img || k.pendingId !== nextId) return;
-            k.id = nextId;
-            k.name = freshData.name;
-            k.wish = freshData.wish;
-            k.timestamp = freshData.timestamp;
-            k.imgElement = img;
-          });
+        if (this.krathongs.length > maxVisible) {
+          this.krathongs.splice(i, 1);
+          continue;
+        }
+        this.wrapKrathong(k, wrapMargin);
+      }
+    }
+  }
+
+  getForegroundObstacles() {
+    const background = this.currentBackground;
+    if (!background?.isDefault || !background.imgElement) return [];
+    const img = background.imgElement;
+    const imageWidth = img.naturalWidth;
+    const imageHeight = img.naturalHeight;
+    if (!imageWidth || !imageHeight) return [];
+
+    const scale = Math.max(this.width / imageWidth, this.height / imageHeight);
+    const offsetX = (this.width - imageWidth * scale) / 2;
+    const offsetY = (this.height - imageHeight * scale) / 2;
+
+    // Bottom-left and bottom-right giant foreground krathongs
+    return [
+      {
+        side: 'left',
+        x: offsetX + 105 * scale,
+        y: offsetY + (735 + 93) * scale,
+        rx: 105 * scale,
+        ry: 85 * scale
+      },
+      {
+        side: 'right',
+        x: offsetX + (imageWidth - 220 + 115) * scale,
+        y: offsetY + (735 + 93) * scale,
+        rx: 105 * scale,
+        ry: 85 * scale
+      }
+    ];
+  }
+
+  applyKrathongRepulsion(dtFactor) {
+    const count = this.krathongs.length;
+    if (count === 0) return;
+
+    const forces = this.krathongs.map(() => ({ fx: 0, fy: 0 }));
+
+    for (let i = 0; i < count; i++) {
+      const a = this.krathongs[i];
+      for (let j = i + 1; j < count; j++) {
+        const b = this.krathongs[j];
+
+        // Minimum safe separation including krathong body & name tag below
+        const minDistX = (a.width + b.width) * 0.5 + 24;
+        const minDistY = (a.height + b.height) * 0.45 + 36;
+
+        const dx = b.x - a.x;
+        const dy = b.baseY - a.baseY;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        if (absDx < minDistX && absDy < minDistY) {
+          const overlapX = (minDistX - absDx) / minDistX;
+          const overlapY = (minDistY - absDy) / minDistY;
+          const strength = overlapX * overlapY;
+
+          const dirX = dx === 0 ? (i < j ? 1 : -1) : (dx > 0 ? 1 : -1);
+          const dirY = dy === 0 ? (a.depthTier <= b.depthTier ? 1 : -1) : (dy > 0 ? 1 : -1);
+
+          const isPinnedA = this.hoveredKrathong === a || this.activeBubbleKrathong === a;
+          const isPinnedB = this.hoveredKrathong === b || this.activeBubbleKrathong === b;
+          const weightA = isPinnedA ? 0.1 : (isPinnedB ? 1.8 : 1.0);
+          const weightB = isPinnedB ? 0.1 : (isPinnedA ? 1.8 : 1.0);
+
+          const pushX = strength * 0.55;
+          const pushY = strength * 0.45;
+
+          forces[i].fx -= dirX * pushX * weightA;
+          forces[j].fx += dirX * pushX * weightB;
+          forces[i].fy -= dirY * pushY * weightA;
+          forces[j].fy += dirY * pushY * weightB;
         }
       }
+    }
+
+    // Steer krathongs smoothly around foreground giant krathongs
+    const obstacles = this.getForegroundObstacles();
+    const rightObs = obstacles.find((o) => o.side === 'right');
+    const leftObs = obstacles.find((o) => o.side === 'left');
+
+    for (let i = 0; i < count; i++) {
+      const k = this.krathongs[i];
+      let avoiding = false;
+
+      for (const obs of obstacles) {
+        const safeRx = obs.rx + k.width * 0.5 + 22;
+        const safeRy = obs.ry + k.height * 0.5 + 34; // include name tag below krathong
+        const dx = k.x - obs.x;
+        const dy = k.baseY - obs.y;
+        const lookAheadLeft = obs.side === 'right' ? safeRx * 1.55 : safeRx * 1.3;
+
+        // Look-ahead zone: start curving upward smoothly before reaching the giant krathong
+        if (dx > -lookAheadLeft && dx < safeRx * 0.95 && dy > -safeRy) {
+          avoiding = true;
+          const proxX = dx < 0
+            ? Math.max(0, 1 - (-dx) / lookAheadLeft)
+            : Math.max(0, 1 - dx / (safeRx * 0.95));
+          const proxY = Math.max(0, 1 - Math.max(0, obs.y - k.baseY) / safeRy);
+          const steerStrength = proxX * (0.45 + 0.55 * proxY);
+
+          // Curve upward around the top of the giant krathong
+          forces[i].fy -= steerStrength * 1.35;
+
+          if (obs.side === 'right' && dx < safeRx * 0.15 && proxY > 0.2) {
+            // Slow down a bit more when approaching the bottom-right giant krathong
+            forces[i].fx -= steerStrength * 0.42;
+          }
+
+          // Hard-ish boundary guard so it never penetrates the giant krathong
+          const normDistSq = (dx / safeRx) ** 2 + (dy / safeRy) ** 2;
+          if (normDistSq < 1.0 && k.baseY > obs.y - safeRy) {
+            const targetY = obs.y - safeRy * Math.sqrt(Math.max(0, 1 - (dx / safeRx) ** 2));
+            const minWaterY = this.waterlineY + 30;
+            k.baseY = Math.max(minWaterY, Math.min(k.baseY, targetY));
+          }
+        }
+      }
+
+      // After clearing the bottom-left giant krathong, let Tier 2 krathongs gently flow down toward the lower river
+      if (!avoiding && k.depthTier === 2 && leftObs && rightObs) {
+        const leftClearX = leftObs.x + leftObs.rx + k.width * 0.5 + 30;
+        const rightApproachX = rightObs.x - (rightObs.rx + k.width * 0.5 + 22) * 1.55;
+        if (k.x > leftClearX && k.x < rightApproachX) {
+          const { minY, maxY } = this.getTierYBounds(k.depthTier, k.height);
+          const targetMidLowY = minY + (maxY - minY) * 0.65;
+          if (k.baseY < targetMidLowY) {
+            forces[i].fy += Math.min(0.32, (targetMidLowY - k.baseY) * 0.008);
+          }
+        }
+      }
+
+      if (avoiding) {
+        k.avoidingForeground = true;
+      }
+    }
+
+    const blend = Math.min(1, 0.15 * dtFactor);
+    for (let i = 0; i < count; i++) {
+      const k = this.krathongs[i];
+      k.repelVx = (k.repelVx || 0) + (forces[i].fx - (k.repelVx || 0)) * blend;
+      k.repelVy = (k.repelVy || 0) + (forces[i].fy - (k.repelVy || 0)) * blend;
+    }
+  }
+
+  wrapKrathong(k, wrapMargin) {
+    let entryX = -wrapMargin;
+    const sortedLeft = this.krathongs
+      .filter((other) => other !== k && other.x < 120)
+      .sort((a, b) => b.x - a.x);
+
+    for (const other of sortedLeft) {
+      const minDistX = (k.width + other.width) * 0.5 + 24;
+      const minDistY = (k.height + other.height) * 0.45 + 36;
+      if (Math.abs(other.baseY - k.baseY) < minDistY && other.x < entryX + minDistX && other.x > entryX - minDistX) {
+        entryX = other.x - minDistX;
+      }
+    }
+
+    k.x = entryX;
+    k.baseY = this.findClearY(k.depthTier, k.x, k.height, k);
+    k.y = k.baseY;
+    k.repelVx = 0;
+    k.repelVy = 0;
+    k.avoidingForeground = false;
+
+    // Cycle through every stored krathong before showing one again.
+    if (this.allKrathongs.length > this.krathongs.length) {
+      const freshData = this.allKrathongs[this.nextKrathongIndex % this.allKrathongs.length];
+      this.nextKrathongIndex++;
+      const source = freshData.imageData || (() => {
+        const base = KRATHONG_ASSETS.bases.find((b) => b.id === freshData.baseId) || KRATHONG_ASSETS.bases[0];
+        return base.src || svgToDataUrl(base.svg);
+      })();
+      const nextId = freshData.id;
+      k.pendingId = nextId;
+      this.getCachedImage(source).then((img) => {
+        if (!img || k.pendingId !== nextId) return;
+        k.id = nextId;
+        k.name = freshData.name;
+        k.wish = freshData.wish;
+        k.timestamp = freshData.timestamp;
+        k.imgElement = img;
+      });
     }
   }
 

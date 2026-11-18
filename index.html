@@ -49,6 +49,20 @@
         <span class="btn-text">เปลี่ยนฉากหลัง</span>
       </button>
 
+      <aside class="reward-panel is-collapsed" id="rewardPanel" aria-label="สุ่มรางวัลผู้ร่วมกิจกรรม">
+        <div class="reward-panel-header" role="button" tabindex="0" aria-label="เปิด/ปิดกล่องผู้บริหารสุ่มรางวัล">
+          <strong>🎁 ผู้บริหารสุ่มรางวัล</strong>
+          <button id="rewardToggleBtn" class="reward-toggle-btn" type="button" aria-expanded="false" aria-controls="rewardPanelBody" title="ย่อ/ขยายกล่องสุ่มรางวัล">▾</button>
+        </div>
+        <div class="reward-panel-body" id="rewardPanelBody">
+          <div class="reward-panel-actions">
+            <button id="drawWinnerBtn" class="btn-glass" type="button">สุ่มจากรายชื่อผู้ลอยกระทง</button>
+            <button id="viewWinnersBtn" class="btn-glass" type="button" title="ดูรายชื่อผู้ได้รับรางวัล">🏆</button>
+          </div>
+          <span id="drawResult" role="status">ผู้ร่วมกิจกรรมที่แสดงชื่อมีสิทธิ์ร่วมสุ่ม</span>
+        </div>
+      </aside>
+
       <button class="btn-glass btn-icon-only" id="btnOpenBackup" title="สำรอง / กู้คืนข้อมูล (JSON)">
         <span>💾</span>
       </button>
@@ -65,19 +79,6 @@
 
   <audio id="backgroundMusic" src="bgmusics/เพลงลอยกระทง.mp3" preload="none" loop></audio>
   <div class="music-credit">เพลงลอยกระทง · <a href="https://www.youtube.com/watch?v=CMEkHkX_dkg" target="_blank" rel="noopener noreferrer">อ้างอิงเพลง</a></div>
-  <aside class="reward-panel" id="rewardPanel" aria-label="สุ่มรางวัลผู้ร่วมกิจกรรม">
-    <div class="reward-panel-header">
-      <strong>🎁 ผู้บริหารสุ่มรางวัล</strong>
-      <button id="rewardToggleBtn" class="reward-toggle-btn" type="button" aria-expanded="true" aria-controls="rewardPanelBody" title="ย่อ/ขยายกล่องสุ่มรางวัล">▾</button>
-    </div>
-    <div class="reward-panel-body" id="rewardPanelBody">
-      <div class="reward-panel-actions">
-        <button id="drawWinnerBtn" class="btn-glass" type="button">สุ่มจากรายชื่อผู้ลอยกระทง</button>
-        <button id="viewWinnersBtn" class="btn-glass" type="button" title="ดูรายชื่อผู้ได้รับรางวัล">🏆</button>
-      </div>
-      <span id="drawResult" role="status">ผู้ร่วมกิจกรรมที่แสดงชื่อมีสิทธิ์ร่วมสุ่ม</span>
-    </div>
-  </aside>
 
   <!-- ========================================================================
        MAIN RIVER VIEWPORT (CANVAS ANIMATION SCENE)
